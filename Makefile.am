@@ -39,6 +39,8 @@ dist_plymouth_SCRIPTS=dracut/RHEL7/crypt-tpm/cryptroot-ask.sh \
                       dracut/RHEL7/crypt-tpm/tpm-try-authless-indexes.sh
 endif
 
+$(dist_plymouth_SCRIPTS):
+
 dist_sbin_SCRIPTS=tpm-luks/tpm-luks-chain-hashes \
 	     tpm-luks/tpm-luks \
 	     tpm-luks/tpm-luks-gen-tgrub-pcr-values \
