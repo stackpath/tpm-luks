@@ -1,7 +1,7 @@
 %define dracutlibdir %{_prefix}/lib/dracut
 
 %define dracut_mod_name 90crypt-tpm
-%if 0%{?rhel} >= 6
+%if 0%{?rhel} == 6
 %define dracut_mod_name 50plymouth-tpm
 %endif
 
@@ -16,7 +16,7 @@ License:	GPLv2
 Source0:	tpm-luks-%{version}.tar.xz
 BuildRoot:	%(mktemp -ud %{_tmppath}/%{name}-%{version}-%{release}-XXXXXX)
 
-BuildRequires:	automake autoconf libtool
+BuildRequires:	automake autoconf libtool openssl-devel
 #Requires:	cryptsetup dracut gawk coreutils grubby tpm-tools trousers
 # for now we require an upstream tpm-tools and trousers, so don't add them
 # here so we can avoid --nodeps
@@ -29,6 +29,7 @@ tpm-luks is a set of scripts to enable storage of a LUKS key in your TPM.
 %setup -q
 
 %build
+autoreconf -ivh
 %configure --prefix=/usr --libdir=%{_libdir}
 make %{?_smp_mflags}
 
@@ -44,13 +45,7 @@ make install DESTDIR=$RPM_BUILD_ROOT
 %doc README TODO
 %config /etc/dracut.conf.d/tpm-luks.conf
 %{_bindir}/*
-#%{_bindir}/getcapability
-#%{_bindir}/nv_readvalue
 %{_sbindir}/*
-#%{_sbindir}/chain_hashes
-#%{_sbindir}/gen_pcr_values
-#%{_sbindir}/tpm_luks
-#%{_sbindir}/tpm-luks-update-hook
 %dir %{dracutlibdir}/modules.d/%{dracut_mod_name}
 %{dracutlibdir}/modules.d/%{dracut_mod_name}/*
 %dir /etc/yum/post-actions
