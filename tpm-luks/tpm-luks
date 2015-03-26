@@ -206,7 +206,7 @@ function nv_define_and_write
 	fi
 
 	if [ "${OWNERPASS}" != "-y" ]; then
-		OWNERPASS_OPTION="-o${OWNERPASS}"
+		OWNERPASS_OPTION="--pwdo=${OWNERPASS}"
 	fi
 	
 	NVEXISTS=$(tpm_nvinfo -i ${NVINDEX} | grep NVRAM)
