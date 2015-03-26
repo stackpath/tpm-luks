@@ -13,6 +13,8 @@ function cleanup
 	rm -f ${NVPERMSFILE}
 }
 
+cleanup
+
 trap cleanup EXIT
 
 DEVICES=( $(cat ${CONF} | awk -F: '! /^#/ {print $1}') )
@@ -22,27 +24,39 @@ SCRIPTS=( $(cat ${CONF} | awk -F: '! /^#/ {print $3}') )
 NUM_DEVICES=$(( ${#DEVICES[@]} - 1 ))
 NUM_INDEXES=$(( ${#INDEXES[@]} - 1 ))
 NUM_SCRIPTS=$(( ${#SCRIPTS[@]} - 1 ))
+NUM_UNIQUES=$(( $(for t in ${INDEXES[@]}; do echo $t; done | sort -u | wc -l) - 1 ))
 
 if [ $NUM_SCRIPTS -ne $NUM_DEVICES -o $NUM_DEVICES -ne $NUM_INDEXES ]; then
 	echo "${CONF} parse error" 1>&2
 	exit 1
 fi
 
+if [ $NUM_UNIQUES -ne $NUM_DEVICES ]; then
+	echo "${CONF} parse error, all NVRAM indexes must be different" 1>&2
+	exit 1
+fi
+
 for d in $(seq 0 $NUM_DEVICES); do
 	echo "Generating PCR values for ${DEVICES[$d]}..."
-	${SCRIPTS[$d]} -o ${NVPERMSFILE}
-	if [ $? -ne 0 ]; then
-		echo "${SCRIPTS[$d]} has failed. Aborting."
-		exit 2
+	if [ -x ${SCRIPTS[$d]} ]; then
+		${SCRIPTS[$d]} -o ${NVPERMSFILE}
+		if [ $? -ne 0 ]; then
+			echo "${SCRIPTS[$d]} has failed. Aborting."
+			exit 2
+		fi
 	fi
 
 	echo "Creating new TPM NVRAM secret for ${DEVICES[$d]}..."
-	tpm-luks -c -d ${DEVICES[$d]} -i ${INDEXES[$d]} -p ${NVPERMSFILE}
+	if [ -f ${NVPERMSFILE} ]; then
+		tpm-luks -c -d ${DEVICES[$d]} -i ${INDEXES[$d]} -p ${NVPERMSFILE}
+	else
+		tpm-luks -c -d ${DEVICES[$d]} -i ${INDEXES[$d]}
+	fi
 	if [ $? -ne 0 ]; then
 		echo "tpm-luks has failed. Aborting."
 		exit 3
 	fi
-	rm -f ${NVPERMSFILE}
+	[ -f ${NVPERMSFILE} ] && rm -f ${NVPERMSFILE}
 done
 
 exit 0
