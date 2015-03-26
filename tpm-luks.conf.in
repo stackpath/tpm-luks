@@ -13,6 +13,10 @@
 #	   as used by tpm_nvdefine -f. See tpm-luks-gen-tgrub-pcr-values
 #	   for info on the format of the script file.
 #
+# Note: all TPM NVRAM indexes must be different at the moment, until init,
+#	update and dracut crypt-tpm module is rewritten to allow the use of
+#	the same index for severall LUKS devices
+#
 # example:
 #
 #/dev/sda2:1:@sbindir@/tpm-luks-gen-tgrub-pcr-values
