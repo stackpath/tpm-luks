@@ -50,15 +50,18 @@ install() {
         cmdline >> "${initdir}/etc/cmdline.d/90crypt.conf"
         echo >> "${initdir}/etc/cmdline.d/90crypt.conf"
     fi
+    
+    inst_multiple getcapability nv_readvalue awk od dd cut cat grep
+    inst_script "$moddir"/cryptroot-ask-tpm.sh /sbin/cryptroot-ask-tpm
 
     inst_multiple cryptsetup rmdir readlink umount
     inst_script "$moddir"/cryptroot-ask.sh /sbin/cryptroot-ask
     inst_script "$moddir"/probe-keydev.sh /sbin/probe-keydev
     inst_hook cmdline 10 "$moddir/parse-keydev.sh"
     inst_hook cmdline 30 "$moddir/parse-crypt.sh"
-    if ! dracut_module_included "systemd"; then
+#    if ! dracut_module_included "systemd"; then
         inst_hook cleanup 30 "$moddir/crypt-cleanup.sh"
-    fi
+#    fi
 
     if [[ $hostonly ]] && [[ -f /etc/crypttab ]]; then
         # filter /etc/crypttab for the devices we need
@@ -78,6 +81,11 @@ install() {
             done
         done < /etc/crypttab > $initdir/etc/crypttab
     fi
+    
+    if [[ $hostonly ]] && [[ -f /etc/tpm-luks.conf ]]; then
+    	# copy file as-is
+    	cp /etc/tpm-luks.conf $initdir/etc/tpm-luks.conf
+    fi
 
     inst_simple "$moddir/crypt-lib.sh" "/lib/dracut-crypt-lib.sh"
 
@@ -89,6 +97,6 @@ install() {
         $systemdsystemunitdir/cryptsetup.target \
         $systemdsystemunitdir/sysinit.target.wants/cryptsetup.target \
         systemd-ask-password systemd-tty-ask-password-agent
-    inst_script "$moddir"/crypt-run-generator.sh /sbin/crypt-run-generator
+#    inst_script "$moddir"/crypt-run-generator.sh /sbin/crypt-run-generator
     dracut_need_initqueue
 }
