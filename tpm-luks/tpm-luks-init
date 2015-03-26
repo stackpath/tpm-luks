@@ -5,8 +5,34 @@
 #		 new TPM NVRAM secret for it
 #
 #
+#set -x
 CONF=/etc/tpm-luks.conf
 NVPERMSFILE=$(mktemp /tmp/${0##*/}-XXXXXX)
+NVINDEX=
+LUKS_OPTIONS=
+
+function usage
+{
+	echo "usage ${0##*/}: [options]"
+	echo -e "  -s <slot>          use this LUKS keyslot number (0 to 7)"
+	echo -e "  -i <index|device>  initialize only the specified TPM NVRAM index or device"
+	echo -e "  -h                 help"
+}
+
+while getopts "s:i:h" opt; do
+	case $opt in
+	s)
+		LUKS_OPTIONS="-s ${OPTARG}"
+		;;
+	i)
+		NVINDEX=${OPTARG}
+		;;
+	*)
+		usage
+		exit 255
+		;;
+	esac
+done
 
 function cleanup
 {
@@ -37,6 +63,10 @@ if [ $NUM_UNIQUES -ne $NUM_DEVICES ]; then
 fi
 
 for d in $(seq 0 $NUM_DEVICES); do
+	if [ -n "$NVINDEX" -a "$NVINDEX" != "${INDEXES[$d]}" -a "$NVINDEX" != "${DEVICES[$d]}" ]; then
+		continue
+	fi
+	
 	echo "Generating PCR values for ${DEVICES[$d]}..."
 	if [ -x ${SCRIPTS[$d]} ]; then
 		${SCRIPTS[$d]} -o ${NVPERMSFILE}
@@ -48,12 +78,14 @@ for d in $(seq 0 $NUM_DEVICES); do
 
 	echo "Creating new TPM NVRAM secret for ${DEVICES[$d]}..."
 	if [ -f ${NVPERMSFILE} ]; then
-		tpm-luks -c -d ${DEVICES[$d]} -i ${INDEXES[$d]} -p ${NVPERMSFILE}
+		tpm-luks -c -d ${DEVICES[$d]} -i ${INDEXES[$d]} $LUKS_OPTIONS -p ${NVPERMSFILE}
 	else
-		tpm-luks -c -d ${DEVICES[$d]} -i ${INDEXES[$d]}
+		tpm-luks -c -d ${DEVICES[$d]} -i ${INDEXES[$d]} $LUKS_OPTIONS
 	fi
 	if [ $? -ne 0 ]; then
 		echo "tpm-luks has failed. Aborting."
+		echo "you can restart for a specific TPM NVRAM index"
+		usage
 		exit 3
 	fi
 	[ -f ${NVPERMSFILE} ] && rm -f ${NVPERMSFILE}

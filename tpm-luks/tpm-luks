@@ -206,7 +206,7 @@ function nv_define_and_write
 	fi
 
 	if [ "${OWNERPASS}" != "-y" ]; then
-		OWNERPASS_OPTION="-o ${OWNERPASS}"
+		OWNERPASS_OPTION="-o${OWNERPASS}"
 	fi
 	
 	NVEXISTS=$(tpm_nvinfo -i ${NVINDEX} | grep NVRAM)
@@ -268,8 +268,10 @@ function luks_add_key
 	echo "You will now be prompted to enter any valid LUKS passphrase in order to store"
 	echo -e "the new TPM NVRAM secret in LUKS key slot ${KEY_SLOT}:\n"
 
-	$CRYPTSETUP luksAddKey --key-slot ${KEY_SLOT} $DEVICE ${KEYFILE}
+	$CRYPTSETUP luksAddKey --key-slot ${KEY_SLOT} $DEVICE ${KEYFILE} && return
 	SCRIPT_RC=$?
+	echo "ERROR: you must use another key slot or kill it with 'cryptsetup luksKillSlot $DEVICE $KEY_SLOT'"
+	exit 20
 }
 
 #
@@ -477,6 +479,7 @@ elif [ "${ACTION}" == "open" ]; then
 	wipe_file ${TMPFS_KEYFILE} ${KEYFILE_SIZE}
 elif [ "${ACTION}" == "migrate" ]; then
 	nv_get
+	prompt_for_new_nvpass
 
 	# clear NVINDEX (source to migrate from) so that find_free_nv_index
 	# will find us a new one
