@@ -208,6 +208,11 @@ function nv_define_and_write
 	if [ "${OWNERPASS}" != "-y" ]; then
 		OWNERPASS_OPTION="-o ${OWNERPASS}"
 	fi
+	
+	NVEXISTS=$(tpm_nvinfo -i ${NVINDEX} | grep NVRAM)
+	if [ -n "${NVEXISTS}" ]; then
+		tpm_nvrelease -i ${NVINDEX} ${OWNERPASS_OPTION}
+	fi
 
 	if [ -n "${PERMSFILE}" ]; then
 		tpm_nvdefine -i ${NVINDEX} -s ${KEYFILE_SIZE} -p ${RW_PERMS} \
@@ -475,8 +480,8 @@ elif [ "${ACTION}" == "migrate" ]; then
 
 	# clear NVINDEX (source to migrate from) so that find_free_nv_index
 	# will find us a new one
-	OLDNVINDEX=${NVINDEX}
-	NVINDEX=""
+	#OLDNVINDEX=${NVINDEX}
+	#NVINDEX=""
 	nv_define_and_write ${PERMSFILE}
 	RC=$?
 
