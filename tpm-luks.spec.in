@@ -29,7 +29,7 @@ tpm-luks is a set of scripts to enable storage of a LUKS key in your TPM.
 %setup -q
 
 %build
-autoreconf -ivh
+autoreconf -ivf
 %configure --prefix=/usr --libdir=%{_libdir}
 make %{?_smp_mflags}
 
