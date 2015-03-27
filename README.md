@@ -281,8 +281,8 @@ The main difference between init and update is that init creates a new LUKS key 
 
 by default, tpm-luks needs a password to read the TPM NVRAM.
 This can be changed by editing `/usr/sbin/tpm-luks` and changing the `RW_PERMS` value:
-* RWPERMS="AUTHREAD|AUTHWRITE" to have a password required
-* RWPERMS="AUTHWRITE" to have no password required
+* `RWPERMS="AUTHREAD|AUTHWRITE"` to have a password required
+* `RWPERMS="AUTHWRITE"` to have no password required
 
 If you change it you, will need to update all TPM NVRAM:
 
@@ -380,6 +380,17 @@ When kernel is updated by yum, it should automatically call `tpm-luks-update`, b
 If you want to use password protected NVRAM (sealed or not), be aware that you'll be asked for the password for each LUKS disk. This is by design, to prevent caching password or LUKS key (even in a temporary folder), and thus reducing security of the boot loader, and explains why you need to set a different TPM NVRAM index for all entries in `/etc/tpm-luks.conf` file.
 	
 If you activate logging during the boot process (using rd.debug option for example), all NVRAM passwords may be written in the log files in clear text, which is a security risk. You should remove thoses files as soon as possible.
+
+If you want to see all PCR, you can run this:
+```bash
+cat /sys/class/misc/tpm0/device/pcrs
+```
+
+To install RHEL7 without EFI support:
+* disable secure boot in the BIOS security
+* remove all EFI boot entries in BIOS boot order, or at least move them to the bottom
+This way the RHEL7 installation CDROM/USB will boot in the non-EFI partition, allowing to install without EFI.
+If you do not do this, it will boot with EFI, and there is no option to install without EFI mode.
 
 ##F. Rescue
 
