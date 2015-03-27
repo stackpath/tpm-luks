@@ -35,8 +35,7 @@ dist_plymouth_SCRIPTS=dracut/RHEL7/crypt-tpm/cryptroot-ask.sh \
                       dracut/RHEL7/crypt-tpm/module-setup.sh \
                       dracut/RHEL7/crypt-tpm/parse-crypt.sh \
                       dracut/RHEL7/crypt-tpm/parse-keydev.sh \
-                      dracut/RHEL7/crypt-tpm/probe-keydev.sh \
-                      dracut/RHEL7/crypt-tpm/tpm-try-authless-indexes.sh
+                      dracut/RHEL7/crypt-tpm/probe-keydev.sh
 endif
 
 dist_sbin_SCRIPTS=tpm-luks/tpm-luks-chain-hashes \
