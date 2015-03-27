@@ -389,7 +389,9 @@ cat /sys/class/misc/tpm0/device/pcrs
 To install RHEL7 without EFI support:
 * disable secure boot in the BIOS security
 * remove all EFI boot entries in BIOS boot order, or at least move them to the bottom
+
 This way the RHEL7 installation CDROM/USB will boot in the non-EFI partition, allowing to install without EFI.
+
 If you do not do this, it will boot with EFI, and there is no option to install without EFI mode.
 
 ##F. Rescue
