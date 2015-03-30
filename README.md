@@ -308,6 +308,8 @@ now that you can boot using the TPM NVRAM, with or without a password, you can s
 
 Before doing this, it is recommended to backup the original LUKS headers, and save them somewhere else, for all devices.
 
+> You must save files directly to a USB key, without saving them temporarily on the local disk or memory. If you do so, remember to 0'ed them before removal with a command such as `dd if=/dev/zero of=${FILENAME} bs=1 count=${FILESIZE}`.
+
 ```bash
 blkid -c /dev/null | grep crypto_LUKS | cut -d: -f1 | xargs -i sh -c "cryptsetup luksHeaderBackup {} --header-backup-file luks-header-backup\$(echo {}|tr '/' '-')"
 ```
