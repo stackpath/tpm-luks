@@ -49,7 +49,7 @@ if [ -z "$NVSIZE" ]; then
 fi
 
 if [ -n "${MATCH1}" -a "${MATCH1}" != "Yes" ]; then
-	warn "TPM NV index does not match PCT state."
+	warn "TPM NV index does not match PCR state."
 	exit 255
 fi
 
@@ -64,7 +64,7 @@ if [ -n "$NVRESULT" -a -z "$PASS" ]; then
 	if [ ${AUTHREAD} -ne 0 -o ${OWNERREAD} -ne 0 ]; then
 		ask_for_password --tries 3 \
 			--cmd "cryptroot-ask-tpm $DEVICE $NAME pass" \
-			--prompt "TPM NVRAM Password ($DEVICE)"
+			--prompt "TPM NVRAM Password ($DEVICE), '-' to skip"
 	
 		exit 0
 	fi
@@ -90,6 +90,11 @@ if [ -n "$PASS" ]; then
 		read NVPASS
 	fi
 	NVPASS_OPTIONS="-pwdd ${NVPASS}"
+fi
+
+# use '-' password to skip and forget about TPM password
+if [ "${NVPASS}" == "-" ]; then
+	exit 0
 fi
 
 KEYFILE=${TMPFS_MNT}/key
