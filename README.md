@@ -342,7 +342,7 @@ blkid -c /dev/null | grep crypto_LUKS | cut -d: -f1 | xargs -i cryptsetup luksKi
 
 ##D. Secure boot
 
-To get a full chain of trust up through your initramfs, you'll first need to install TrustedGRUB2, then seal the TPM NVRAM using the PCR automatically filled. The default PCR used for sealing the TPM NVRAM are 8-11, but this can be changed easily by editing the file `tpm-luks-gen-tgrub2-pcr-values`.
+To get a full chain of trust up through your initramfs, you'll first need to install TrustedGRUB2, then seal the TPM NVRAM using the PCR automatically filled. The default PCR used for sealing the TPM NVRAM are 4-5,8-11, but this can be changed easily by editing the file `tpm-luks-gen-tgrub2-pcr-values`.
 
 > "Sealing" means binding the TPM NVRAM data to the state of your machine. Using sealing, you can require any arbitrary software to have run and recorded its state in the TPM before your LUKS secret would be released from the TPM chip. The usual use case would be to boot using a TPM-aware bootloader which records the kernel and initramfs you've booted. This would prevent your LUKS secret from being retrieved from the TPM chip if the machine was booted from any other media or configuration.
 
