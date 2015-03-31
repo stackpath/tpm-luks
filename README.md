@@ -367,7 +367,7 @@ yum localinstall TrustedGRUB2-1.0.0-1.el7.x86_64.rpm
 Then, update the boot loader, on sda disk for example:
 ```bash
 grub-install /dev/sda
-grub-mkconfig -o /boot/grub2/grub.cfg
+grub-mkconfig -o /boot/grub/grub.cfg
 ```
 
 Then, update /etc/tpm-luks.conf to use PCR values by adding `tpm-luks-gen-tgrub2-pcr-values` at the end of each line.
@@ -378,10 +378,10 @@ The file should now look like:
 /dev/mapper/rhel-swap:3:tpm-luks-gen-tgrub2-pcr-values
 ```
 
-Then, just run dracut to build a new initramfs:
+Then, **backup old initramfs**, and run dracut to build a new initramfs:
 
 ```bash
-dracut --force
+dracut
 ```
 
 Now reboot to computing all final PCR values correctly.
