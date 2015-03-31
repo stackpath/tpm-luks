@@ -28,20 +28,20 @@
 # How do you know which PCRs to use? The canonical reference document that
 # describes which PCRs are used for which purposes for TPM 1.2 is here:
 #
-# http://www.trustedcomputinggroup.org/files/temp/64505409-1D09-3519-AD5C611FAD3F799B/PC%20Client%20Implementa
+# http://www.trustedcomputinggroup.org/files/temp/64505409-1D09-3519-AD5C611FAD3F799B/PC%20Client%20Implementation%20for%20BIOS.pdf
 #
 # See section 3.2.3. A summary for convenience:
 #
-# PCR Index     Use
-# 0             CRTM, BIOS, and Host Platform Extensions
-# 1             Host Platform Configuration
-# 2             Option ROM Code
-# 3             Option ROM Configuration and Data
-# 4             IPL Code (usually the MBR)
-# 5             IPL Code Configuration and Data
-# 6             State Transition and Wake Events
-# 7             Host Platform Manufacturer Control
-# 8-15          Used by the OS
+# PCR Index	Use
+# 0		CRTM, BIOS, and Host Platform Extensions
+# 1		Host Platform Configuration
+# 2		Option ROM Code
+# 3		Option ROM Configuration and Data
+# 4		IPL Code (usually the MBR)
+# 5		IPL Code Configuration and Data
+# 6		State Transition and Wake Events
+# 7		Host Platform Manufacturer Control
+# 8-15		Used by the OS
 #
 # An explanation of the "srtm" profile (below):
 #
@@ -64,30 +64,30 @@ SOURCE=/sys/class/misc/tpm0/device/pcrs
 OUTFILE=/dev/stdout
 
 if [ -z "${PCRS}" ]; then
-        exit 0
+	exit 0
 elif [ ! -e ${SOURCE} ]; then
-        echo "PCR measurements file not found, is securityfs mounted?" 1>&2
-        exit 255
+	echo "PCR measurements file not found, is securityfs mounted?" 1>&2
+	exit 255
 fi
 
 function usage
 {
-        echo "usage ${0##/*} [options]"
-        echo "options:"
-        echo
-        echo "  -o <file> Optional file to write NVRAM permissions files to (default is stdout)"
+	echo "usage ${0##/*} [options]"
+	echo "options:"
+	echo
+	echo "  -o <file> Optional file to write NVRAM permissions files to (default is stdout)"
 }
 
 while getopts "o:m:" opt; do
-        case $opt in
-        o)
-                OUTFILE=$OPTARG
-                ;;
-        *)
-                usage
-                exit 255
-                ;;
-        esac
+	case $opt in
+	o)
+		OUTFILE=$OPTARG
+		;;
+	*)
+		usage
+		exit 255
+		;;
+	esac
 done
 
 cleanup()
@@ -107,9 +107,9 @@ trap cleanup EXIT
 #echo "Writing PCRs for \"$MENU\" boot entries:"
 cat $SOURCE | sed "s/ //g" > $TMPFILE
 for PCRNUM in $PCRS; do
-        PCRNUM2=$(printf "%02d" $PCRNUM)
-        PCR=$( cat $TMPFILE | awk -F: "\$1 ~ /PCR-$PCRNUM2/ { print tolower(\$2) }" )
-        echo "r $PCRNUM $PCR" >> ${OUTFILE}
+	PCRNUM2=$(printf "%02d" $PCRNUM)
+	PCR=$( cat $TMPFILE | awk -F: "\$1 ~ /PCR-$PCRNUM2/ { print tolower(\$2) }" )
+	echo "r $PCRNUM $PCR" >> ${OUTFILE}
 done
 
 exit 0
