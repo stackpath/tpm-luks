@@ -103,6 +103,19 @@ function tpm_owned
 	return 0
 }
 
+function tpm_tcsd
+{
+        tpm_version &> /dev/null
+        RC=$?
+        if [ $RC -ne 0 ]; then
+                echo "ERROR: The 'tcsd' service is not started. Please run 'tcsd' and"
+                echo "re-run this script."
+                exit 40
+        fi
+
+        return 0
+}
+
 #
 # find_luks_nv_indexes - list defined NVRAM indexes that match the size we're
 #                        looking for
@@ -448,6 +461,7 @@ done
 # always check that TPM is enabled and owned
 tpm_enabled
 tpm_owned
+tpm_tcsd
 
 # handle the passwords we need to gather
 echo ${RW_PERMS} | grep -qi AUTH
