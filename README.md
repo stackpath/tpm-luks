@@ -1,4 +1,6 @@
-This is still work in progress, but everything has been tested, except *D. Trusted boot* and PCR identification...
+This is still work in progress, but everything has been tested, except:
+- using trusted boot, section *D. Trusted boot*
+- `tpm-luks-gen-tgrub2-pcr-values` script file not yet written
 
 #Storing your LUKS key in TPM NVRAM for RHEL7, and seal them with PCR using TrustedGRUB2
 
@@ -90,7 +92,7 @@ make install
 
 To get a full chain of trust up through your initramfs, you'll first need to install [TrustedGRUB2], a GRUB2 fork that offers TCG (TPM) support for granting the integrity of the full boot process, known as trusted boot.
 
-This is done by measuring all critical components during the boot process, and write some of them into TPM PCRs, allowing to reuse them for sealing the TPM NVRAM if you wich to.
+This is done by measuring all critical components during the boot process, and write some of them into TPM PCR, allowing to reuse them for sealing the TPM NVRAM if you wich to.
 
 Note that TrustedGRUB2 is based on grub2 version 2.0.0, which is not up-to-date with latest 2.0.2, and has some minor differences you must be aware of:
 
@@ -284,11 +286,7 @@ This can be changed by editing `/usr/sbin/tpm-luks` and changing the `RW_PERMS` 
 * `RWPERMS="AUTHREAD|AUTHWRITE"` to have a password required
 * `RWPERMS="AUTHWRITE"` to have no password required
 
-If you change it you, will need to update all TPM NVRAM:
-
-```bash
-tpm-luks-update
-```
+If you change it you, will need to update all TPM NVRAM agin using `tpm-luks-update`.
 
 ###4. Finalize
 
@@ -308,13 +306,35 @@ now that you can boot using the TPM NVRAM, with or without a password, you can s
 
 Before doing this, it is recommended to backup the original LUKS headers, and save them somewhere else, for all devices.
 
-> You must save files directly to a USB key, without saving them temporarily on the local disk or memory. If you do so, remember to 0'ed them before removal with a command such as `dd if=/dev/zero of=${FILENAME} bs=1 count=${FILESIZE}`.
+> You must NOT save the files to a local hard disk, it is recommended to create a tmpfs filesystem before moving the files to another computer.
+
+First, backup all LUKS header files:
 
 ```bash
-blkid -c /dev/null | grep crypto_LUKS | cut -d: -f1 | xargs -i sh -c "cryptsetup luksHeaderBackup {} --header-backup-file luks-header-backup\$(echo {}|tr '/' '-')"
+mkdir /tmp/luks-headers
+mount -t tmpfs -o size=20M tmfs /tmp/luks-headers
+cd /tmp/luks-headers
+blkid -c /dev/null | grep crypto_LUKS | cut -d: -f1 | xargs -i sh -c "cryptsetup luksHeaderBackup {} --header-backup-file luks-header-$(hostname -s)\$(echo {}|tr '/' '-')"
+md5sum * > luks-header-$(hostname -s).md5
+tar zcf luks-header-$(hostname -s).tgz *
 ```
 
-You can now safely remove the slot #0:
+Then transfer the files using your usual copy tool, like scp.
+```bash
+scp luks-header-$(hostname -s).tgz [user@][hostname:/][path]
+```
+
+Finaly, cleanup the temporary space:
+
+```bash
+cd /tmp/luks-headers
+ls luks-header* | xargs -i dd if=/dev/zero of={} bs=1M
+cd /tmp
+umount /tmp/luks-headers
+rmdir /tmp/luks-headers
+```
+
+You can now safely remove the slot #0 containing the textual password:
 
 ```bash
 blkid -c /dev/null | grep crypto_LUKS | cut -d: -f1 | xargs -i cryptsetup luksKillSlot {} 0
@@ -322,17 +342,20 @@ blkid -c /dev/null | grep crypto_LUKS | cut -d: -f1 | xargs -i cryptsetup luksKi
 
 ##D. Secure boot
 
-To get a full chain of trust up through your initramfs, you'll first need to install TrustedGRUB2, then seal the TPM NVRAM using the PCR automatically filled.
+To get a full chain of trust up through your initramfs, you'll first need to install TrustedGRUB2, then seal the TPM NVRAM using the PCR automatically filled. The default PCR used for sealing the TPM NVRAM are 4-5,8-11, but this can be changed easily by editing the file `tpm-luks-gen-tgrub2-pcr-values`.
 
 > "Sealing" means binding the TPM NVRAM data to the state of your machine. Using sealing, you can require any arbitrary software to have run and recorded its state in the TPM before your LUKS secret would be released from the TPM chip. The usual use case would be to boot using a TPM-aware bootloader which records the kernel and initramfs you've booted. This would prevent your LUKS secret from being retrieved from the TPM chip if the machine was booted from any other media or configuration.
 
 Some benefits (this is my simple humble opinion, and might not be totaly true...):
 * there is no way to retrieve TPM NVRAM values without login access to the server, as they are protected by PCR values that are dependent on the booting process -> booting on another USB device or altering the boot will NOT generate the same PCR values, making it impossible to read the TPM NVRAM
-* in case disks are stolen, the LUKS partitions are protected with a generated key, preventing the use of dictionary attacks
-* the only way to retrieve the key is to login in the server and read the TPM NVRAM data, unless a nadditional password has been set. In that case, it is even more robust
-* the TPM NVRAM password can be "weaker", as TPM conatins an auto-locking feature to protect it against dictionary attacks
-* no more need to use an USB key containing the LUKS keys, which requires physical access to the server or DRAC access, as one can use a simple password
-* stolen disks cannot be read, as LUKS are protected with keys instead of password
+* stolen disks cannot be read easily, as the LUKS partitions are protected with a generated key, preventing the use of dictionary attacks
+* the only way to retrieve the key is to log on the server and read the TPM NVRAM data, unless an additional password has been set. In that case, it is even more robust
+* the TPM NVRAM password can be "weak", as TPM conatins an auto-locking feature to protect it against dictionary attacks
+* no more need to use an USB key containing the LUKS keys, which requires physical access to the server or DRAC access, as one can use a simple password, except in case of rescue
+
+Unfortunately, it seems not so easy to compute PCR values the same way as TrustedGRUB2 will do, making it impossible to compute the PCR values manually in order to seal the TPM NVRAM.
+
+The *trick* to achieve the same result is to install everything without sealing, then reboot to let TrustedGRUB2 compute the final PCR values, and finally do the sealing.
 
 To install TrustedGRUB2, you will need to remove grub2 and grub2-tools:
 
@@ -341,38 +364,36 @@ yum remove grub2 grub2-tools
 yum localinstall TrustedGRUB2-1.0.0-1.el7.x86_64.rpm
 ```
 
-Then you will have to update tpm-luks configuration file `/etc/tpm-luks.conf` to allow computation of the expected PCR values, update your initramfs, then update your TPM NVRAM, all this in the correct order.
+Then, update the boot loader, on sda disk for example:
+```bash
+grub-install /dev/sda
+grub-mkconfig -o /boot/grub/grub.cfg
+```
 
-###1. Update tpm-luks configuration
-
-You must edit the `/etc/tpm-luks.conf` file to use the script that computes the PCR expected values, `tpm-luks-gen-tgrub2-pcr-values.'
-
-At the end, you file should contain something like:
-
+Then, update /etc/tpm-luks.conf to use PCR values by adding `tpm-luks-gen-tgrub2-pcr-values` at the end of each line.
+The file should now look like:
 ```
 /dev/sda2:1:tpm-luks-gen-tgrub2-pcr-values
 /dev/mapper/rhel-root:2:tpm-luks-gen-tgrub2-pcr-values
 /dev/mapper/rhel-swap:3:tpm-luks-gen-tgrub2-pcr-values
 ```
 
-###2. Build new initramfs
-
-As before, just run dracut to build a new initramfs:
+Then, **backup old initramfs**, and run dracut to build a new initramfs:
 
 ```bash
-dracut --force
+dracut
 ```
 
-###3. Seal TPM NVRAM
+Now reboot to computing all final PCR values correctly.
 
-Sealing the TPM NVRAM is very simple, as it only requires to get existing keys inside them, and recreate them with the expected PCR values. All this job is already performed by the update script of tpm-luks:
+The last task is to seal the TPM NVRAM with the live PCR values:
 
 ```bash
 tpm-luks-update
 ```
-	
-Which PCR yould you want to use ?
-	
+
+Reboot again, and if it works as expected, you can safely remove textual password from the LUKS headers if not done yet. If not, jump to *F. Rescue*.
+
 ##E. Notes
 
 If your TPM becomes locked with an error like "The TPM is defending against dictionary attacks and is in a time-out period", it is possible to reset the lock with `tpm_resetdalock`.
@@ -398,7 +419,39 @@ If you do not do this, it will boot with EFI, and there is no option to install 
 
 ##F. Rescue
 
-TO BE DONE
+You may need to rescue the boot loader if something goes wrong during the long life of the server.
+
+This might happen if:
+- kernal was updated but `tpm-luks-update` didn't work correctly
+- boot loader was overwritten by error with another one than TrustedGRUB2
+- grub.cfg was modified manually
+- whatever else
+
+A very simple way to rescue the boot and LUKS partition is to restore the LUKS headers with the backuped ones, and may-be reinstall TrustedGRUB2.
+
+To restore LUKS disks and partitions:
+- download and burn PCD Linux http://rescuecd.pld-linux.org/ to an USB/CDROM/whatever
+- boot on it
+- `loadkeys fr` for french keyboard layout
+- `blkid`
+- copy LUKS headers backups files back, untar if needed
+- for disks:
+  - `cryptsetup luksHeaderRestore /dev/sdX luks-header-*-sdX`
+  - `cryptsetup luksOpen /dev/sdX crypt-sdX`
+- `vgchange -ay`
+- for partitions:
+  - `cryptsetup luksHeaderRestore /dev/mapper/rhel-X luks-header-*-mapper-rhel-X`
+  - `cryptsetup luksOpen /dev/mapper/rhel-X X`
+
+To work on the boot configuration and reinstall TrustedGRUB2:
+- `mount /dev/mapper/root /tmp`
+- `mount /dev/sda1 /tmp/boot`
+- `mount -o bind /proc /mnt/proc`
+- `mount -o bind /dev /mnt/dev`
+- `mount -o bind /dev/pts /mnt/dev/pts`
+- `mount -o bind /sys /mnt/sys`
+- `chroot /mnt /bin/bash`
+- do whatever is needed
 
 [trousers]: http://sourceforge.net/projects/trousers/
 [tpm-tools]: http://sourceforge.net/projects/trousers/
