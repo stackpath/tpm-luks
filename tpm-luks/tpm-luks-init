@@ -10,16 +10,18 @@ CONF=/etc/tpm-luks.conf
 NVPERMSFILE=$(mktemp /tmp/${0##*/}-XXXXXX)
 NVINDEX=
 LUKS_OPTIONS=
+NO_SCRIPT=0
 
 function usage
 {
 	echo "usage ${0##*/}: [options]"
-	echo -e "  -s <slot>          use this LUKS keyslot number (0 to 7)"
-	echo -e "  -i <index|device>  initialize only the specified TPM NVRAM index or device"
+	echo -e "  -s <slot>          LUKS keyslot number to use (0 to 7)"
+	echo -e "  -i <index|device>  TPM NVRAM index or device to use"
+	echo -e "  -n                 no script execution"
 	echo -e "  -h                 help"
 }
 
-while getopts "s:i:h" opt; do
+while getopts "s:i:nh" opt; do
 	case $opt in
 	s)
 		LUKS_OPTIONS="-s ${OPTARG}"
@@ -27,6 +29,8 @@ while getopts "s:i:h" opt; do
 	i)
 		NVINDEX=${OPTARG}
 		;;
+	n)
+		NO_SCRIPT=1
 	*)
 		usage
 		exit 255
@@ -67,8 +71,8 @@ for d in $(seq 0 $NUM_DEVICES); do
 		continue
 	fi
 	
-	echo "Generating PCR values for ${DEVICES[$d]}..."
-	if [ -x ${SCRIPTS[$d]} ]; then
+	if [ -x ${SCRIPTS[$d]} -a ${NO_SCRIPT} -eq 0 ]; then
+		echo "Generating PCR values for ${DEVICES[$d]}..."
 		${SCRIPTS[$d]} -o ${NVPERMSFILE}
 		if [ $? -ne 0 ]; then
 			echo "${SCRIPTS[$d]} has failed. Aborting."
