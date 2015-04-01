@@ -10,14 +10,18 @@
 #	  NVRAM indexes with tpm_nvinfo.
 #
 # script - full path to a script that produces a TPM NVRAM permissions file,
-#	   as used by tpm_nvdefine -f. See tpm-luks-gen-tgrub-pcr-values
+#	   as used by tpm_nvdefine -f. See tpm-luks-gen-tgrub2-pcr-values
 #	   for info on the format of the script file.
 #
 # Note: all TPM NVRAM indexes must be different at the moment, until init,
 #	update and dracut crypt-tpm module is rewritten to allow the use of
 #	the same index for severall LUKS devices
 #
+#	to disable the use of TPM NVRAM PCR:
+#	- use '-' as script name (<device>:<index>:-)
+#	- or use '-n' option when running tpm-luks-init or tpm-luks-update
+#
 # example:
 #
-#/dev/sda2:1:@sbindir@/tpm-luks-gen-tgrub-pcr-values
+#/dev/sda2:1:@sbindir@/tpm-luks-gen-tgrub2-pcr-values
 #
