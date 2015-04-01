@@ -346,12 +346,16 @@ To get a full chain of trust up through your initramfs, you'll first need to ins
 
 > "Sealing" means binding the TPM NVRAM data to the state of your machine. Using sealing, you can require any arbitrary software to have run and recorded its state in the TPM before your LUKS secret would be released from the TPM chip. The usual use case would be to boot using a TPM-aware bootloader which records the kernel and initramfs you've booted. This would prevent your LUKS secret from being retrieved from the TPM chip if the machine was booted from any other media or configuration.
 
+###1. Benefits
+
 Some benefits (this is my simple humble opinion, and might not be totaly true...):
 * there is no way to retrieve TPM NVRAM values without login access to the server, as they are protected by PCR values that are dependent on the booting process -> booting on another USB device or altering the boot will NOT generate the same PCR values, making it impossible to read the TPM NVRAM
 * stolen disks cannot be read easily, as the LUKS partitions are protected with a generated key, preventing the use of dictionary attacks
 * the only way to retrieve the key is to log on the server and read the TPM NVRAM data, unless an additional password has been set. In that case, it is even more robust
 * the TPM NVRAM password can be "weak", as TPM conatins an auto-locking feature to protect it against dictionary attacks
 * no more need to use an USB key containing the LUKS keys, which requires physical access to the server or DRAC access, as one can use a simple password, except in case of rescue
+
+###2. Install and configuration
 
 Unfortunately, it seems not so easy to compute PCR values the same way as TrustedGRUB2 will do, making it impossible to compute the PCR values manually in order to seal the TPM NVRAM.
 
@@ -393,6 +397,25 @@ tpm-luks-update
 ```
 
 Reboot again, and if it works as expected, you can safely remove textual password from the LUKS headers if not done yet. If not, jump to *F. Rescue*.
+
+###3. Update
+
+In case you know that it will be necessary to re-seal the TPM NVRAM because the PCR will change, and you don't want to use the *F. Rescue* section, it is possible to disable TPM PCR easily without going through all the items in this chapter.
+
+Disable the use of the TPM PCR:
+
+```bash
+tpm-luks-update -n
+```
+
+Then reboot the server, and finally re-enable the use of the TPM PCR:
+
+```bash
+tpm-luks-update
+```
+
+You should reboot again to check that everything is ok.
+
 
 ##E. Notes
 
