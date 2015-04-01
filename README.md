@@ -183,12 +183,13 @@ cp tpm-tools-1.3.8.tar.gz rpmbuild/SOURCES/
 cp tpm-tools-1.3.8/dist/tpm-tools.spec rpmbuild/SPECS/
 sed -i 's/libtpm_unseal.so.0/libtpm_unseal.so.?/' rpmbuild/SPECS/tpm-tools.spec
 sed -i 's/opencryptoki-devel/opencryptoki/g' rpmbuild/SPECS/tpm-tools.spec
+sed -ri 's/(define\s+release\s+)1/\17/g' rpmbuild/SPECS/tpm-tools.spec
 rpmbuild -bs rpmbuild/SPECS/tpm-tools.spec
 mock -r rhel --clean
 mock -r rhel --yum-cmd localinstall rpmbuild/RPMS/trousers-0.3.13-1.x86_64.rpm
 mock -r rhel --yum-cmd localinstall rpmbuild/RPMS/trousers-devel-0.3.13-1.x86_64.rpm
 mock -r rhel --yum-cmd localinstall opencryptoki-devel-3.0-11.el7.x86_64.rpm
-mock -r rhel --resultdir=rpmbuild/RPMS/ rpmbuild/SRPMS/tpm-tools-1.3.8-1.src.rpm --no-clean --no-cleanup-after
+mock -r rhel --resultdir=rpmbuild/RPMS/ rpmbuild/SRPMS/tpm-tools-1.3.8-7.src.rpm --no-clean --no-cleanup-after
 ```
 
 ###4. Build tpm-luks RPM
@@ -242,7 +243,7 @@ To manually install the RPM, you can:
 ```bash
 useradd -r tss
 yum localinstall trousers-0.3.13-1.x86_64.rpm
-yum localinstall tpm-tools-1.3.8-1.x86_64.rpm
+yum localinstall tpm-tools-1.3.8-7.x86_64.rpm
 yum localinstall tpm-luks-0.8-2.el7.x86_64.rpm
 ```
 
