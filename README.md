@@ -134,7 +134,7 @@ su - makerpm
 mkdir -p ~/rpmbuild/{BUILD,RPMS,SOURCES,SPECS,SRPMS}
 ```
 	
-Create a new configuration file `/etc/mock/rhel.cfg` based on `/etc/mock/default.cfg` and change yum sources to use cdrom and epel repository, and use @core instead of @buildsys-build.
+Create a new configuration file `/etc/mock/rhel.cfg` based on `/etc/mock/default.cfg` and change yum sources to use cdrom and epel repository, and use `@core @development` instead of `@buildsys-build`.
 
 You can then verify the good installation of mock:
 
