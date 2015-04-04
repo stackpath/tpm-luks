@@ -128,13 +128,13 @@ Note that all rpms will be placed in ~makerpm/rpmbuild/RPMS.
 ###1. Install and configure rpmbuild and mock for RHEL
 
 ```bash
-yum install rpmbuild mock
+yum install rpm-build mock
 useradd -G mock makerpm
 su - makerpm
 mkdir -p ~/rpmbuild/{BUILD,RPMS,SOURCES,SPECS,SRPMS}
 ```
 	
-Create a new configuration file `/etc/mock/rhel.cfg` based on `/etc/mock/default.cfg` and change yum sources to use cdrom and epel repository.
+Create a new configuration file `/etc/mock/rhel.cfg` based on `/etc/mock/default.cfg` and change yum sources to use cdrom and epel repository, and use @core instead of @buildsys-build.
 
 You can then verify the good installation of mock:
 
