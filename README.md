@@ -218,7 +218,7 @@ cd
 wget https://github.com/Sirrix-AG/TrustedGRUB2/archive/1.0.0.tar.gz -O TrustedGRUB2-1.0.0.tar.gz
 wget http://mirror.centos.org/centos/7/os/x86_64/Packages/guile-2.0.9-5.el7.x86_64.rpm
 wget http://mirror.centos.org/centos/7/os/x86_64/Packages/autogen-5.18-5.el7.x86_64.rpm
-wget https://github.com/momiji/tpm-luks/xtra/TrustedGRUB2.spec
+wget https://raw.githubusercontent.com/momiji/tpm-luks/master/xtra/TrustedGRUB2.spec
 tar xf TrustedGRUB2-1.0.0.tar.gz
 cp TrustedGRUB2.spec TrustedGRUB2-1.0.0/
 tar zcf TrustedGRUB2-1.0.0.tar.gz TrustedGRUB2-1.0.0
