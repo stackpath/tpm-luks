@@ -31,6 +31,7 @@ make %{?_smp_mflags} CFLAGS= CXXFLAGS= FFLAGS= FCFLAGS= LDFLAGS= CCASFLAGS=
 %install
 [ "${RPM_BUILD_ROOT}" != "/" ] && [ -d ${RPM_BUILD_ROOT} ] && rm -rf ${RPM_BUILD_ROOT};
 make install DESTDIR=$RPM_BUILD_ROOT
+touch $RPM_BUILD_DIR/$RPM_PACKAGE_NAME-$RPM_PACKAGE_VERSION/debugfiles.list
 
 %clean
 [ "${RPM_BUILD_ROOT}" != "/" ] && [ -d ${RPM_BUILD_ROOT} ] && rm -rf ${RPM_BUILD_ROOT};
