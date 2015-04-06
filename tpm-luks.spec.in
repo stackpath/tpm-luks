@@ -54,6 +54,9 @@ make install DESTDIR=$RPM_BUILD_ROOT
 /usr/lib/yum-plugins/post-transaction-actions.py
 %config /etc/tpm-luks.conf
 
+%exclude /usr/lib/yum-plugins/post-transaction-actions.pyc
+%exclude /usr/lib/yum-plugins/post-transaction-actions.pyo
+
 %changelog
 * Tue Apr 09 2013 Ryan Harper <ryanh@us.ibm.com>
 - Updated to build on F18
