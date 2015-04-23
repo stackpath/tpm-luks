@@ -406,17 +406,18 @@ In case you know that it will be necessary to re-seal the TPM NVRAM because the 
 Disable the use of the TPM PCR:
 
 ```bash
+tcsd
 tpm-luks-update -n
 ```
 
 Then reboot the server, and finally re-enable the use of the TPM PCR:
 
 ```bash
+tcsd
 tpm-luks-update
 ```
 
 You should reboot again to check that everything is ok.
-
 
 ##E. Notes
 
