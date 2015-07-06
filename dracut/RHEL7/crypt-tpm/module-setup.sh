@@ -80,6 +80,7 @@ install() {
                 fi
             done
         done < /etc/crypttab > $initdir/etc/crypttab
+        cp -f /etc/crypttab $initdir/etc/crypttab
     fi
     
     if [[ $hostonly ]] && [[ -f /etc/tpm-luks.conf ]]; then

@@ -11,6 +11,7 @@ NVPERMSFILE=$(mktemp /tmp/${0##*/}-XXXXXX)
 NVINDEX=
 LUKS_OPTIONS=
 NO_SCRIPT=0
+RWPERMS="AUTHWRITE"
 
 function usage
 {
@@ -18,6 +19,7 @@ function usage
 	echo -e "  -s <slot>          LUKS keyslot number to use (0 to 7)"
 	echo -e "  -i <index|device>  TPM NVRAM index or device to use"
 	echo -e "  -n                 no script execution"
+	echo -e "  -r                 set nvram perm to read/write by author"
 	echo -e "  -h                 help"
 }
 
@@ -31,6 +33,9 @@ while getopts "s:i:nh" opt; do
 		;;
 	n)
 		NO_SCRIPT=1
+		;;
+	r)
+		RW_PERMS="AUTHREAD|AUTHWRITE"
 		;;
 	*)
 		usage
@@ -83,9 +88,9 @@ for d in $(seq 0 $NUM_DEVICES); do
 
 	echo "Creating new TPM NVRAM secret for ${DEVICES[$d]}..."
 	if [ -f ${NVPERMSFILE} ]; then
-		tpm-luks -c -d ${DEVICES[$d]} -i ${INDEXES[$d]} $LUKS_OPTIONS -p ${NVPERMSFILE}
+		tpm-luks -c -d ${DEVICES[$d]} -i ${INDEXES[$d]} $LUKS_OPTIONS -P "$RW_PERMS" -p ${NVPERMSFILE}
 	else
-		tpm-luks -c -d ${DEVICES[$d]} -i ${INDEXES[$d]} $LUKS_OPTIONS
+		tpm-luks -c -d ${DEVICES[$d]} -i ${INDEXES[$d]} $LUKS_OPTIONS -P "$RW_PERMS"
 	fi
 	if [ $? -ne 0 ]; then
 		echo "tpm-luks has failed. Aborting."

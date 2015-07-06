@@ -7,11 +7,13 @@
 CONF=/etc/tpm-luks.conf
 NVPERMSFILE=$(mktemp /tmp/${0##*/}-XXXXXX)
 NO_SCRIPT=0
+RWPERMS="AUTHWRITE"
 
 function usage
 {
         echo "usage ${0##*/}: [options]"
         echo -e "  -n                 no script execution"
+        echo -e "  -r                 set nvram perm to read/write by author"
         echo -e "  -h                 help"
 }
 
@@ -19,6 +21,9 @@ while getopts "nh" opt; do
         case $opt in
         n)
                 NO_SCRIPT=1
+                ;;
+        r)
+                RW_PERMS="AUTHREAD|AUTHWRITE"
                 ;;
         *)
                 usage
@@ -68,9 +73,9 @@ for d in $(seq 0 $NUM_DEVICES); do
 
 	echo "Migrating TPM NVRAM secret for ${DEVICES[$d]}..."
 	if [ -f ${NVPERMSFILE} ]; then
-		tpm-luks -m -i ${INDEXES[$d]} -d ${DEVICES[$d]} -p ${NVPERMSFILE}
+		tpm-luks -m -i ${INDEXES[$d]} -d ${DEVICES[$d]} -P "$RW_PERMS" -p ${NVPERMSFILE}
 	else
-		tpm-luks -m -i ${INDEXES[$d]} -d ${DEVICES[$d]}
+		tpm-luks -m -i ${INDEXES[$d]} -d ${DEVICES[$d]} -P "$RW_PERMS"
 	fi
 	if [ $? -ne 0 ]; then
 		echo "ERROR: update failed. Aborting."
