@@ -7,7 +7,7 @@
 CONF=/etc/tpm-luks.conf
 NVPERMSFILE=$(mktemp /tmp/${0##*/}-XXXXXX)
 NO_SCRIPT=0
-RWPERMS="AUTHWRITE"
+RW_PERMS="AUTHWRITE"
 
 function usage
 {
