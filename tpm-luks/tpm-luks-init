@@ -23,7 +23,7 @@ function usage
 	echo -e "  -h                 help"
 }
 
-while getopts "s:i:nh" opt; do
+while getopts "s:i:nrh" opt; do
 	case $opt in
 	s)
 		LUKS_OPTIONS="-s ${OPTARG}"

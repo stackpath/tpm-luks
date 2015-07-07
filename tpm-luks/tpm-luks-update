@@ -17,7 +17,7 @@ function usage
         echo -e "  -h                 help"
 }
 
-while getopts "nh" opt; do
+while getopts "nrh" opt; do
         case $opt in
         n)
                 NO_SCRIPT=1
