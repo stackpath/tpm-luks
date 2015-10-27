@@ -8,8 +8,8 @@ action=$1
 
 mkdir -p src work
 
-url=https://github.com/Sirrix-AG/TrustedGRUB2/archive/1.0.0.tar.gz
-file=TrustedGRUB2-1.0.0.tar.gz
+url=https://github.com/Sirrix-AG/TrustedGRUB2/archive/1.2.1.tar.gz
+file=TrustedGRUB2-1.2.1.tar.gz
 dir=${file%.tar.gz}
 pkg=$dir-1.el7
 spec=dist/TrustedGRUB2.spec
@@ -17,12 +17,12 @@ specf=${spec##*/}
 
 ext1=http://mirror.centos.org/centos/7/os/x86_64/Packages/guile-2.0.9-5.el7.x86_64.rpm
 ext2=http://mirror.centos.org/centos/7/os/x86_64/Packages/autogen-5.18-5.el7.x86_64.rpm
-specu=https://raw.githubusercontent.com/momiji/tpm-luks/master/xtra/TrustedGRUB2.spec
+specu=TrustedGRUB2.spec
    
 if [ "$action" == "1" -o -z "$action" ]; then
    [ -f src/${ext1##*/} ] || wget $ext1 -P src
    [ -f src/${ext2##*/} ] || wget $ext2 -P src
-   [ -f src/${specu##*/} ] || wget $specu -P src --no-check-certificate
+   [ -f src/$specu ] || cp $specu src
    [ -f src/$file ] || wget $url -O src/$file --no-check-certificate
 fi
 
@@ -31,7 +31,7 @@ if [ "$action" == "2" -o "$action" == "3" -o -z "$action" ]; then
    (
    cd work
    tar zxf ../src/$file
-   cp -f ../src/${specu##*/} $dir/
+   cp -f ../src/$specu $dir/
    tar zcf $file $dir/
    )
    cp -f work/$file ~/rpmbuild/SOURCES/
