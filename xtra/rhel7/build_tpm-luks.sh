@@ -29,7 +29,7 @@ if [ "$action" == "1" -o -z "$action" ]; then
    cd work
    tar zxf ../src/$file
    cd $dir
-   sudo yum install automake autoconf libtool openssl openssl-devel
+   sudo yum install -y automake autoconf libtool openssl openssl-devel
    autoreconf -ivf
    ./configure
    )
