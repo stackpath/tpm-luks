@@ -29,7 +29,7 @@ if [ "$action" == "1" -o -z "$action" ]; then
    tar zxf ../src/$file
    cd $dir
    id tss &> /dev/null || sudo useradd -r tss
-   sudo yum install automake autoconf libtool openssl openssl-devel ../../src/$ext1f gtk+ ~/rpmbuild/RPMS/$dep1 ~/rpmbuild/RPMS/$dep2
+   sudo yum install -y automake autoconf libtool openssl openssl-devel ../../src/$ext1f gtk+ ~/rpmbuild/RPMS/$dep1 ~/rpmbuild/RPMS/$dep2
    sudo ln -s /usr/lib64/libtspi.so.1 /usr/lib64/libtspi.so
    ./configure
    )
