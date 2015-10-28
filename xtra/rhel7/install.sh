@@ -15,7 +15,7 @@ if [ $EUID -eq 0 ]; then
 	yum install -y wget
 	if [ ! -f epel-release-latest-7.noarch.rpm ]; then
 		wget https://dl.fedoraproject.org/pub/epel/epel-release-latest-7.noarch.rpm
-		rpm -Uvh epel-release-7*.rpm
+		rpm -Uvh epel-release-*.rpm
 	fi
 
 	#install packages
