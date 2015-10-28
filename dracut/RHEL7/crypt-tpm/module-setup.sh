@@ -65,21 +65,21 @@ install() {
 
     if [[ $hostonly ]] && [[ -f /etc/crypttab ]]; then
         # filter /etc/crypttab for the devices we need
-        while read _mapper _dev _rest; do
-            [[ $_mapper = \#* ]] && continue
-            [[ $_dev ]] || continue
-
-            [[ $_dev == UUID=* ]] && \
-                _dev="/dev/disk/by-uuid/${_dev#UUID=}"
-
-            for _hdev in "${!host_fs_types[@]}"; do
-                [[ ${host_fs_types[$_hdev]} == "crypto_LUKS" ]] || continue
-                if [[ $_hdev -ef $_dev ]] || [[ /dev/block/$_hdev -ef $_dev ]]; then
-                    echo "$_mapper $_dev $_rest"
-                    break
-                fi
-            done
-        done < /etc/crypttab > $initdir/etc/crypttab
+        #while read _mapper _dev _rest; do
+        #    [[ $_mapper = \#* ]] && continue
+        #    [[ $_dev ]] || continue
+		#
+        #    [[ $_dev == UUID=* ]] && \
+        #        _dev="/dev/disk/by-uuid/${_dev#UUID=}"
+		#
+        #    for _hdev in "${!host_fs_types[@]}"; do
+        #        [[ ${host_fs_types[$_hdev]} == "crypto_LUKS" ]] || continue
+        #        if [[ $_hdev -ef $_dev ]] || [[ /dev/block/$_hdev -ef $_dev ]]; then
+        #            echo "$_mapper $_dev $_rest"
+        #            break
+        #        fi
+        #    done
+        #done < /etc/crypttab > $initdir/etc/crypttab
         cp -f /etc/crypttab $initdir/etc/crypttab
     fi
     
