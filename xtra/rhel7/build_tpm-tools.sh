@@ -15,7 +15,7 @@ pkg=$dir-7
 spec=dist/tpm-tools.spec
 specf=${spec##*/}
 
-ext1=ftp://rpmfind.net/linux/centos/7.0.1406/os/x86_64/Packages/opencryptoki-devel-3.0-11.el7.x86_64.rpm
+ext1=ftp://rpmfind.net/linux/centos/7.1.1503/os/x86_64/Packages/opencryptoki-devel-3.2-4.1.el7.x86_64.rpm
 ext1f=${ext1##*/}
 dep1=trousers-0.3.13-1.x86_64.rpm
 dep2=trousers-devel-0.3.13-1.x86_64.rpm
