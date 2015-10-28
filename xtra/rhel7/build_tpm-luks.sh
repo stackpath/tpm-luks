@@ -31,6 +31,7 @@ if [ "$action" == "1" -o -z "$action" ]; then
    cd $dir
    sudo yum install -y automake autoconf libtool openssl openssl-devel
    autoreconf -ivf
+   autoreconf -ivf
    ./configure
    )
 fi
