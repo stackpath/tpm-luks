@@ -25,7 +25,7 @@ rm /etc/yum.conf.new
 
 cont "replacing grub2 with TrustedGRUB2 package..."
 yum remove -y grub2 grub2-tools
-rpm -ivh ./TrustedGRUB2-*.el7.x86_64.rpm
+rpm -ivh ./TrustedGRUB2-[0-9]*.x86_64.rpm
 
 cont "replacing boot loader..."
 lsblk
@@ -41,9 +41,9 @@ cont "creating tss user..."
 useradd -r tss
 
 cont "installing tpm-tools and tpm-luks packages..."
-yum install trousers
-rpm -ivh ./tpm-tools-*.x86_64.rpm
-rpm -ivh ./tpm-luks-*.el7.x86_64.rpm
+yum install -y trousers
+rpm -ivh ./tpm-tools-[0-9]*.x86_64.rpm
+rpm -ivh ./tpm-luks-[0-9]*.x86_64.rpm
 
 cont "testing tpm...."
 tcsd
