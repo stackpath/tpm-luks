@@ -4,7 +4,7 @@
 #dracutmodules+=""
 
 # Dracut modules to omit
-omit_dracutmodules+="@DRACUT_MODULE_NAME@ systemd"
+omit_dracutmodules+="@DRACUT_MODULE_NAME@ systemd plymouth"
 
 # Dracut modules to add to the default
 add_dracutmodules+="@DRACUT_MODULE_NAME@-tpm"

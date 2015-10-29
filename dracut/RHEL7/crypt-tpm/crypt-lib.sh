@@ -216,3 +216,61 @@ readkey() {
     umount "$mntp"
     rmdir "$mntp"
 }
+
+function readpass() {
+
+    unset PASSWORD
+    unset PROMPT
+
+    STTY_ORIG=$(stty -g)
+    #stty -echo
+
+    CHARCOUNT=0
+    ESCAPED=0
+    while IFS= read -p "$PROMPT" -r -s -n 1 CHAR
+    do
+        # Enter - accept password
+        if [[ $CHAR == $'\0' ]] ; then
+            break
+        fi
+        # Backspace
+        if [[ $CHAR == $'\177' ]] ; then
+            if [ $CHARCOUNT -gt 0 ] ; then
+                CHARCOUNT=$((CHARCOUNT-1))
+                PROMPT=$'\b \b'
+                PASSWORD="${PASSWORD%?}"
+            else
+                PROMPT=''
+            fi
+            continue
+        fi
+        # Escape
+        if [[ $CHAR == $'\33' ]] ; then
+            if [ $ESCAPED -eq 0 ] ; then
+                ESCAPED=1
+            else
+                ESCAPED=0
+            fi
+            PROMPT=''
+            continue
+        fi
+        # Any char
+        CHARCOUNT=$((CHARCOUNT+1))
+        if [ $ESCAPED -eq 0 ] ; then
+            PROMPT='*'
+        else
+            PROMPT="$CHAR"
+        fi
+        PASSWORD+="$CHAR"
+    done
+
+    stty $STTY_ORIG
+
+    if [ -z "$1" ] ; then
+        echo $PASSWORD
+    else
+        eval $1='$PASSWORD'
+        echo
+    fi
+
+}

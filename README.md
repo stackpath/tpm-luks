@@ -35,36 +35,37 @@ It is recommended to start with a fresh minimal install of rhel7. This is one po
 * create a cdrom repo:
 
 ```
-cat > /etc/yum.repos.d/cdrom.repo
+cat <<EOF > /etc/yum.repos.d/cdrom.repo
 [cdrom]
 name=cdrom
 baseurl=file:///mnt/cdrom
 enabled=1
 gpgcheck=0
+EOF
 ```
 
 * verify it works: `yum update`
-* install git : yum install git
+* install git : `yum install -y git`
 
 You can now configure the system using the scripts in xtra/rhel7 folder:
 
 ```
-git clone https://github.com/momiji/tpm-luks.git
+git clone https://github.com/momiji/tpm-luks
 cd tpm-luks/xtra/rhel7
 ./install.sh -d
 sudo su - makerpm
-git clone https://github.com/momiji/tpm-luks.git
+git clone https://github.com/momiji/tpm-luks
 cd tpm-luks/xtra/rhel7
 ./install.sh -d
 ```
 
-When successfull, you can now start building the RPMS:
+When successfull, you can start building the RPMS:
 
 ```
 ./build_trousers.sh -d
 ./build_tpm-tools.sh -d
 ./build_tpm-luks.sh -d
-./build_trustedrub2.sh -d
+./build_trustedgrub2.sh -d
 ```
 
 ##B. Installing
