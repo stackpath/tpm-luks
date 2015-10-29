@@ -55,7 +55,7 @@ if [ "$PASS" == "" -o "$PASS" == "read" ]; then
 		if [ $AUTHREAD -ne 0 -o $OWNERREAD -ne 0 ]; then
 			ask_for_password --tries 3 --tty-echo-off \
 				--cmd "cryptroot-ask-tpm $DEVICE $NAME read" \
-				--prompt "Enter TPM NVRAM password for device: $DEVICE\nESC to show/hide characters, '' to skip\n"
+				--prompt "Enter TPM NVRAM password for device: $DEVICE\nESC to show, '' to skip\n"
 			exit 0
 		fi
 	fi
@@ -132,7 +132,7 @@ if [ "$PASS" == "input" ]; then
 
 	ask_for_password --tries 3 --tty-echo-off \
 		--cmd "cryptroot-ask-tpm $DEVICE $NAME pass" \
-		--prompt "Enter LUKS password for device $DEVICE\nESC to show/hide characters, start with '=' for base64, '==' to escape\n"
+		--prompt "Enter LUKS password for device $DEVICE\nESC to show, '' to skip, start with '=' for base64, '==' to escape\n"
 	exit 0
 
 fi
