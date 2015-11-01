@@ -18,8 +18,7 @@
 #	the same index for severall LUKS devices
 #
 #	to disable the use of TPM NVRAM PCR:
-#	- use '-' as script name (<device>:<index>:-)
-#	- or use '-n' option when running tpm-luks-init or tpm-luks-update
+#	- use '' as script name (<device>:<index>:)
 #
 # example:
 #

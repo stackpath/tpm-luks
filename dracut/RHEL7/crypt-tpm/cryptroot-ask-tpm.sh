@@ -7,7 +7,6 @@
 PATH=/usr/sbin:/usr/bin:/sbin:/bin
 . /lib/dracut-crypt-lib.sh
 
-TPM_LUKS_MAX_NV_INDEX=128
 TPM_LUKS_CONF=/etc/tpm-luks.conf
 TPM_NV_PER_AUTHREAD=0x00040000
 TPM_NV_PER_OWNERREAD=0x00020000
