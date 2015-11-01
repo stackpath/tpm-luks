@@ -24,6 +24,7 @@ NV_USE_PASSWORD=
 DRY_RUN=0
 STTY_ORIG=
 ERRORS=0
+NEED_DRACUT=0
 
 # info TPM NVRAM at @NV_INDEX, set @NEED_AUTH_PASSWORD/@NEED_OWNER_PASSWORD and @USE_PCR.
 function nv_info
@@ -592,7 +593,7 @@ function loop
       REPORT+="- $DEVICE: skipped\n"
       return
     fi
-    if [ $NV_INDEX -eq 0 ]; then
+    if [ $NEW -eq 1 ]; then
       echo "- searching for free TPM NVRAM index"
       find_free_nv_index
       if [ $? -ne 0 ]; then
@@ -649,11 +650,14 @@ function loop
       echo "ERROR: Unable to define or write new TPM NVRAM at index $NV_INDEX, aborting"
       exit 1
     fi
-    echo "- updating $LUKS_CONF configuration"
-    update_conf
-    if [ $? -ne 0 ]; then
-      echo "ERROR: Unable to update $LUKS_CONF file, aborting"
-      exit 1
+    if [ $NEW -eq 1 ]; then
+      echo "- updating $LUKS_CONF configuration"
+      update_conf
+      if [ $? -ne 0 ]; then
+        echo "ERROR: Unable to update $LUKS_CONF file, aborting"
+        exit 1
+      fi
+      NEED_DRACUT=1
     fi
     echo "- killing all other LUKS slots on device"
     luks_kill_all
@@ -750,15 +754,24 @@ fi
 ERRORS=0
 echo
 eval "$PROGRAM"
+
+print_separator
+echo -e -n "LUKS $ACTION status:\n$REPORT"
 print_separator
 
-echo -e -n "LUKS $ACTION status:\n$REPORT"
-
 if [ $ERRORS -ne 0 ]; then
-  print_separator
   echo "There are errors, you can use \`${0##*/} init\` to repair them."
   echo
   exit 1
+fi
+
+if [ $NEED_DRACUT -eq 1 ]; then
+  echo "File $LUKS_CONF has been updated, you must update dracut:"
+  echo "- dracut --force"
+  echo "- tpm-luks-ctl unseal"
+  echo "- reboot"
+  echo "- tpm-luks-ctl seal"
+  echo "- reboot"
 fi
 
 echo

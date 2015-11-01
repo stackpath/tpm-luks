@@ -74,19 +74,27 @@ From there, you can simply call the deploy.sh script, it will install and config
 * install the packages
 * configure the packages
 ```
-curl https://github.com/momiji/tpm-luks/xtra/rhel7/deploy.sh -o deploy.sh
-chmod +x deploy.sh
-./deploy.sh
+curl https://raw.githubusercontent.com/momiji/tpm-luks/master/xtra/rhel7/deploy.sh -o deploy.sh
+sh deploy.sh
 ```
 
-Reboot the server, it will still ask for LUKS paritions passwords, then:
+You can now generate new LUKS keys and seal them:
 ```
 tpm-luks-ctl init
-tpm-luks-ctl seal
 tpm-luks-ctl backup
+reboot
+tpm-luks-ctl seal
+reboot
+tpm-luks-ctl check
 ```
 
-Reboot again to verify everything works as expected.
+For the first boot, keys are not sealed and no password is required.
+For the second boot, keys are sealed and automatically read.
+
+Remember that modifying the `/etc/tpm-luks.conf` requires to update the boot:
+```
+dracut --force`
+```
 
 ## C. Notes
 
@@ -100,7 +108,7 @@ You can check if tpm-luks is configured correctly:
 
 If you want to unseal the TPM, before a reboot for example, remember to seal after the reboot:
 * unseal: `tpm-luks-ctl unseal`
-* reboot
+* `reboot`
 * seal: `tpm-luks-ctl seal`
 
 To add new LUKS partitions:
@@ -108,11 +116,11 @@ To add new LUKS partitions:
 * unseal: `tpm-luks-ctl unseal`
 * add new partitions: `tpm-luks-ctl init`
 * save backup: `tpm-luks-ctl backup`
-* grub-mkconfig -o /boot/grub/grub.cfg
-* dracut --force
-* reboot
+* `grub-mkconfig -o /boot/grub/grub.cfg`
+* `dracut --force`
+* `reboot`
 * seal: `tpm-luks-ctl seal`
-* reboot to verify everything is ok
+* `reboot` to verify everything is ok
 
 [README_OLD]: README_OLD.md
 [trousers]: http://sourceforge.net/projects/trousers/
