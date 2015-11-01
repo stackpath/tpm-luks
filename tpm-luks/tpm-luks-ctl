@@ -1,0 +1,765 @@
+RAND_SOURCE=/dev/urandom
+LUKS_CONF=/etc/tpm-luks.conf
+LUKS_KEY=/dev/shm/luks.key
+LUKS_KEY_SIZE=32
+DEFAULT_PERMS_FILE=/usr/sbin/tpm-luks-gen-tgrub2-pcr-values
+LUKS_PERMS=/dev/shm/luks.perms
+
+DEVICE=
+UUID=
+IN_CONF=0
+NV_INDEX=0
+NV_INDEX_LIMIT=128
+USE_PCR=
+PERMS_FILE=
+INTERACTIVE=1
+NEED_AUTH_PASSWORD=0
+NEED_OWNER_PASSWORD=0
+AUTH_PASSWORD=
+OWNER_PASSWORD=
+ACTION=
+REPORT=
+NV_SEAL_WITH_PCR=0
+NV_USE_PASSWORD=
+DRY_RUN=0
+STTY_ORIG=
+ERRORS=0
+
+# info TPM NVRAM at @NV_INDEX, set @NEED_AUTH_PASSWORD/@NEED_OWNER_PASSWORD and @USE_PCR.
+function nv_info
+{
+  USE_PCR=0
+  NEED_PASSWORD=0
+  
+  _nvexists=$(tpm_nvinfo -i $NV_INDEX | grep NVRAM)
+  [ -z "$_nvexists" ] && return 1
+  
+  _pcrs=$(tpm_nvinfo -i $NV_INDEX | grep PCRs)
+  [ -n "$_pcrs" ] && USE_PCR=1
+  
+  _auth=$(tpm_nvinfo -i $NV_INDEX | awk '$1 ~ /Permissions/ { print $4 }' | grep AUTHREAD)
+  [ -n "$_auth" ] && NEED_AUTH_PASSWORD=1
+  
+  _owner=$(tpm_nvinfo -i $NV_INDEX | awk '$1 ~ /Permissions/ { print $4 }' | grep OWNERREAD)
+  [ -n "$_owner" ] && NEED_OWNER_PASSWORD=1
+  
+  return 0
+}
+
+# read TPM NVRAM at @NV_INDEX using @AUTH_PASSWORD if @NEED_AUTH_PASSWORD, @OWNER_PASSWORD if @NEED_OWNER_PASSWORD, and write into @LUKS_KEY
+function nv_read
+{
+  _size=$(tpm_nvinfo -i $NV_INDEX | awk '$1 ~ /Size/ { print $3 }')
+  [ -z "$_size" ] && return 1
+  [ $_size -ne $LUKS_KEY_SIZE ] && return 1
+  
+  _options=
+  [ $NEED_AUTH_PASSWORD -eq 1 -a -z "$_options" ] && _options="--password='$AUTH_PASSWORD'"
+  [ $NEED_OWNER_PASSWORD -eq 1 -a -z "$_options" ] && _options="--password='$OWNER_PASSWORD'"
+  
+  tpm_nvread -i $NV_INDEX -s $LUKS_KEY_SIZE -f $LUKS_KEY $options >/dev/null || return 1
+  
+  return 0
+}
+
+# find a free TPM NVRAM index, starting at 2 for obscure reason. if current @NV_INDEX is available and >= 2, keep it
+function find_free_nv_index
+{
+  if [ $NV_INDEX -gt 2 ]; then
+    _nv_exists=$(tpm_nvinfo -i $NV_INDEX | grep NVRAM)
+    if [ -z "$_nv_exists" ]; then
+      return 0
+    fi
+  fi
+  
+  # start at index 2, as in testing, the Atmel TPM threw errors if NV index 1 was used
+  _nv_index=2
+  _nv_indexes=$(tpm_nvinfo | awk '$1$2 ~ /NVRAMindex/ { print $4 }' | sort)
+
+  for i in $_nv_indexes; do
+    if [ $_nv_index -gt $NV_INDEX_LIMIT ]; then
+      return 1
+    fi
+
+    if [ $(( $i )) -gt $_nv_index ]; then
+      NV_INDEX=$_nv_index
+      return 0
+    elif [ $(( $i )) -eq $_nv_index ]; then
+      _nv_index=$(( $_nv_index + 1 ))
+    fi
+  done
+  
+  NV_INDEX=$_nv_index
+  return 0
+}
+
+# create and write TPM NVRAM at @NV_INDEX with @LUKS_KEY.
+# Seal with PCRs if @NV_SEAL_WITH_PCR and @PERMS_FILE<>"". Use AUTH/OWNER password if @NV_USE_PASSWORD=AUTH/OWNER.
+function nv_define_and_write
+{
+  _nv_exists=$(tpm_nvinfo -i $NV_INDEX | grep NVRAM)
+  if [ -n "$_nv_exists" ]; then
+    if [ $DRY_RUN -eq 0 ]; then
+      tpm_nvrelease -i $NV_INDEX --pwdo="$OWNER_PASSWORD"
+    else
+      echo "=> dry-run: release TPM NVRAM at index $NV_INDEX"
+    fi
+  fi
+  
+  _use_pcr=0
+  _options="--pwdo='$OWNER_PASSWORD'"
+  _perms="OWNERWRITE"
+  
+  if [ $NV_SEAL_WITH_PCR -eq 1 -a -n "$PERMS_FILE" ]; then
+    $PERMS_FILE -o $LUKS_PERMS
+    if [ $? -ne 0 ]; then
+      return 2
+    fi
+    _use_pcr=1
+    _options="$_options -f $LUKS_PERMS"
+  fi
+  if [ "$NV_USE_PASSWORD" == "AUTH" ]; then
+    _options="$_options --pwda='$AUTH_PASSWORD'"
+    _perms="AUTHREAD|OWNERWRITE"
+  elif [ "$NV_USE_PASSWORD" == "OWNER" ]; then
+    _perms="OWNERREAD|OWNERWRITE"
+  fi
+  
+  if [ $DRY_RUN -eq 0 ]; then
+    tpm_nvdefine -i @NV_INDEX -s $LUKS_KEY_SIZE -f $LUKS_KEY -p "$_perms" -f $LUKS_PERMS --pwdo="$OWNER_PASSWORD" "$_options"
+    [ $? -ne 0 ] && return 1
+  else
+    if [ $_use_pcr -eq 0 ]; then
+      echo "=> dry-run: define new TPM NVRAM at index $NV_INDEX with permission $_perms"
+    else
+      echo "=> dry-run: define new TPM NVRAM at index $NV_INDEX with permission $_perms using PCRs"
+    fi
+  fi
+  
+  return 0
+}
+
+# generate a new key in @LUKS_KEY of size @LUKS_KEY_SIZE
+function keyfile_generate
+{
+  dd if=$RAND_SOURCE of=$LUKS_KEY bs=1c count=$LUKS_KEY_SIZE >/dev/null 2>&1 || return 1
+}
+
+# prompt for TPM NVRAM AUTH password, if not yet set. set @AUTH_PASSWORD. Return 1 if empty
+function prompt_for_nvauth_password
+{
+  [ -n "$AUTH_PASSWORD" ] && return 0
+  
+  echo -n "Enter the TPM NVRAM <auth> password (use ESC to show/hide): "
+  readpass AUTH_PASSWORD
+  
+  [ -z "$AUTH_PASSWORD" ] && return 1
+  
+  return 0
+}
+
+# prompt for TPM NVRAM OWNER password, if not yet set. set @OWNER_PASSWORD. Return 1 if empty
+function prompt_for_nvowner_password
+{
+  [ -n "$OWNER_PASSWORD" ] && return 0
+  
+  echo -n "Enter the TPM NVRAM <owner> password (use ESC to show/hide): "
+  readpass OWNER_PASSWORD
+  
+  [ -z "$OWNER_PASSWORD" ] && return 1
+  
+  return 0
+}
+
+# prompt for LUKS key, write to @LUKS_KEY. Return 1 if empty
+function prompt_for_luks_key
+{
+  while true; do
+    _key=
+    echo -n "Enter the LUKS key encoded in base64 (use ESC to show/hide): "
+    readpass _key
+    
+    [ -z "$_key" ] && return 1
+    
+    echo $_key | base64 -d >$LUKS_KEY 2>/dev/null && break
+  done
+  
+  return 0
+}
+
+# test if $DEVICE can be opened with luks key @LUKS_KEY
+function luks_test_key
+{
+  cryptsetup luksOpen $DEVICE --key-file $LUKS_KEY --test-passphrase &>/dev/null || return 1
+  
+  return 0
+}
+
+# add the LUKS key @LUKS_KEY to @DEVICE
+function luks_add_key
+{
+  _key_slot=
+  _slot_id=0
+  for _s in $(cryptsetup luksDump $DEVICE | awk '$1$2 ~ /KeySlot/ {print $4}'); do
+    if [ "$_s" == "DISABLED" ]; then
+      _key_slot=$_slot_id
+      break
+    fi
+    _slot_id=$(( $_slot_id + 1 ))
+  done
+  [ -z "$_key_slot" ] && return 1
+  
+  if [ $DRY_RUN -eq 0 ]; then
+    echo "You will now be prompted to enter any valid LUKS passphrase in order to store the new TPM NVRAM secret in LUKS key slot $_key_slot:"
+    cryptsetup luksAddKey --key-slot $_key_slot $DEVICE $LUKS_KEY || return 1
+  else
+    echo "=> dry-run: add new LUKS key in slot $_key_slot"
+  fi
+  
+  return 0
+}
+
+# remove all LUKS keys from DEVICE, except the one with @LUKS_KEY
+function luks_kill_all
+{
+  _slot_id=0
+  for _s in $(cryptsetup luksDump $DEVICE | awk '$1$2 ~ /KeySlot/ {print $4}'); do
+    if [ "$_s" == "ENABLED" ]; then
+      cryptsetup luksOpen $DEVICE --key-slot $_slot_id --test-passphrase --key-file $LUKS_KEY &>/dev/null
+      if [ $? -ne 0 ]; then
+        if [ $DRY_RUN -eq 0 ]; then
+          cryptsetup luksKillSlot $DEVICE --key-slot $_slot_id --key-file $LUKS_KEY &>/dev/null
+        else
+          echo "=> dry-run: kill LUKS key in slot $_slot_id"
+        fi
+      fi
+    fi
+    _slot_id=$(( $_slot_id + 1 ))
+  done
+  
+  return 0
+}
+
+# wipe @LUKS_KEY file of size @LUKS_KEY_SIZE
+function wipe_file
+{
+  dd if=/dev/zero of=$LUKS_KEY bs=1c count=$LUKS_KEY_SIZE >/dev/null 2>&1
+  rm -f $LUKS_KEY
+  rm -f $LUKS_PERMS
+}
+
+# verify TPM is enabled
+function tpm_enabled
+{
+  if [ ! -e /sys/class/misc/tpm0/device/enabled ]; then
+    echo "ERROR: Your TPM device driver doesn't appear to be loaded. Please run \`modprobe tpm_tis\` to load the driver and re-run this script."
+    exit 10
+  fi
+
+  if [ ! /sys/class/misc/tpm0/device/enabled ]; then
+    echo "ERROR: Your TPM is not enabled in your BIOS. Please halt the machine and then cold boot into your BIOS to enable the TPM chip."
+    exit 10
+  fi
+
+  return 0
+}
+
+# verify TPM is owned
+function tpm_owned
+{
+  if [ $(cat /sys/class/misc/tpm0/device/owned) -ne 1 ]; then
+    echo "ERROR: Your TPM is unowned, please take ownership:"
+    tpm_takeownership || exit 10
+  fi
+
+  return 0
+}
+
+# verify tcsd is running
+function tpm_tcsd
+{
+  tpm_version &> /dev/null
+  RC=$?
+  if [ $RC -ne 0 ]; then
+    echo "ERROR: The 'tcsd' service is not started. Please run \`tcsd\` and re-run this script."
+    exit 10
+  fi
+  
+  return 0
+}
+
+# read password with '*' displayed, support BACKSPACE and ESC to show/hide password
+function readpass
+{
+    _stty_orig=$(stty -g)
+    stty -echo
+    _password=
+    _prompt=
+    _charcount=0
+    _escaped=0
+    while _ifs= read -p "$_prompt" -r -s -n 1 _char
+    do
+        # Enter - accept password
+        if [[ $_char == $'\0' ]] ; then
+            break
+        fi
+        # Backspace
+        if [[ $_char == $'\177' ]] ; then
+            if [ $_charcount -gt 0 ] ; then
+                _charcount=$((_charcount-1))
+                _prompt=$'\b \b'
+                _password="${_password%?}"
+            else
+                _prompt=''
+            fi
+            continue
+        fi
+        # Escape
+        if [[ $_char == $'\33' ]] ; then
+            if [ $_escaped -eq 0 ] ; then
+                _escaped=1
+            else
+                _escaped=0
+            fi
+            _prompt=''
+            continue
+        fi
+        # Any char
+        _charcount=$((_charcount+1))
+        if [ $_escaped -eq 0 ] ; then
+            _prompt='*'
+        else
+            _prompt="$_char"
+        fi
+        _password+="$_char"
+    done
+
+    stty $_stty_orig
+
+    if [ -z "$1" ] ; then
+        echo $_password
+    else
+        eval $1='$_password'
+        echo
+    fi
+}
+
+# upsert configuration with @DEVICE @NV_INDEX and tgrub2 file
+function update_conf
+{
+  _conf=$(cat $LUKS_CONF | grep "^$DEVICE:")
+  if [ -n "$_conf" ]; then
+    _nv_index=$(echo $_conf | cut -d: -f2)
+    if [ -n "$_nv_index" ]; then
+      if [ $_nv_index -eq $NV_INDEX ]; then
+        return 0
+      fi
+    fi
+  fi
+  
+  rm -f $LUKS_CONF.new
+  cat $LUKS_CONF | grep -v "^$DEVICE:" > $LUKS_CONF.new
+  echo $DEVICE:$NV_INDEX:$DEFAULT_PERMS_FILE >> $LUKS_CONF.new
+
+  if [ $DRY_RUN -eq 0 ]; then
+    cp -f $LUKS_CONF $LUKS_CONF.bak || return 1
+    cp -f $LUKS_CONF.new $LUKS_CONF || return 1
+    rm -f $LUKS_CONF.new
+  else
+    echo "=> dry-run: replace $LUKS_CONF with $LUKS_CONF.new, \`diff -u\`:"
+    diff -u $LUKS_CONF $LUKS_CONF.new
+  fi
+  
+  return 0
+}
+
+# list all LUKS devices: DEVICE UUID NV_INDEX IN_CONF, limited to @DEVICE if set
+function devices_get
+{
+  _call=$1
+  _device=$DEVICE
+  (blkid -c /dev/null -t TYPE=crypto_LUKS -o export ; echo) \
+  | while read _line; do
+    eval $_line
+    if [ -z "$_line" ]; then
+      _nv_index=0
+      _in_conf=0
+      _perms_file=$DEFAULT_PERMS_FILE
+      _conf=$(cat $LUKS_CONF | grep -v "^\s*#")
+      if [ -n "$_conf" ]; then
+        _nv_index=$(echo $_conf | cut -d: -f2)
+        if [ -n "$_nv_index" ]; then
+          _in_conf=1
+          _perms_file=$(echo $_conf | cut -d: -f3)
+        else
+          _nv_index=0
+        fi
+      fi
+      if [ -z "$_device" -o "$_device" == "$DEVNAME" ]; then
+        echo "DEVICE=$DEVNAME ; UUID=$UUID ; NV_INDEX=$_nv_index ; IN_CONF=$_in_conf ; PERMS_FILE=$_perms_file ; $_call"
+      fi
+    fi
+  done
+}
+
+function cleanup
+{
+  wipe_file
+  stty $STTY_ORIG
+}
+
+STTY_ORIG=$(stty -g)
+trap cleanup EXIT
+
+function usage
+{
+  echo "usage: ${0##*/} -b [action] [device]"
+  echo -e "  -b, --batch            run as batch (non-interactive), only for 'check' action"
+  echo -e "  -d, --debug            run in debug mode"
+  echo -e "  -a, --auth-password    add AUTH password when writing TPM NVRAM"
+  echo -e "  -o, --owner-password   add OWNER password when writing TPM NVRAM"
+  echo -e "  -n, --dry-run          do not update TPM NVRAM nor update LUKS keys"
+  echo -e "  -h, --help             show help"
+  echo
+  echo -e "actions:"
+  echo -e "  check                  check configuration"
+  echo -e "  init                   initialize missing LUKS partitions and repair existing LUKS partitions"
+  echo -e "  seal                   seal TPM NVRAM using PCRs, removing the need for TPM NVRAM password"
+  echo -e "  useal                  unseal TPM NVRAM, adding the need for TPM NVRAM"
+  echo -e "  backup                 list all keys as base64 for backup purpose"
+  echo
+  echo -e "[device] must be as in '$LUKS_CONF' or \`blkid\`."
+  echo -e "If it is not empty, the script only applies for that device."
+}
+
+function print_separator
+{
+  echo "--------------------------------------------------------------------------------"
+}
+
+function loop
+{
+  # start by checking device
+  wipe_file
+  print_separator
+  echo "Checking device $DEVICE..."
+  OK=1
+  SKIP=0      # if skip=1 then device is skipped, won't do any actions
+  ERROR=0     # elif error=0 then device is ok, won't do any action
+  RUN_INIT=0  # elif run=0 then device cannot be repaired, won't do any actions
+  RUN_SEAL=0  #
+  NEW=0
+  if [ $IN_CONF -eq 1 ]; then
+    if [ $OK -eq 1 ]; then
+      echo "- reading TPM NVRAM info for index $NV_INDEX"
+      nv_info
+      if [ $? -ne 0 ]; then
+        echo "ERROR: Unable to view TPM NVRAM at index $NV_INDEX"
+        ERROR=1
+        RUN_INIT=1
+        OK=0
+      fi
+    fi
+    if [ $OK -eq 1 ]; then
+      if [ $NEED_AUTH_PASSWORD -eq 1 ]; then
+        echo "WARN: AUTH Password is needed but script is run as non interactive, skipping"
+        if [ $INTERACTIVE -eq 0 -a $ACTION == check ]; then
+          SKIP=1
+          OK=0
+        else
+          echo "- reading TPM NVRAM at index $NV_INDEX requires AUTH password"
+          prompt_for_nvauth_password
+          if [ $? -ne 0 ]; then
+            echo "WARN: AUTH Password is needed but empty password entered, skipping"
+            SKIP=1
+            OK=0
+          fi
+        fi
+      elif [ $NEED_OWNER_PASSWORD -eq 1 ]; then
+        echo "- reading TPM NVRAM at index $NV_INDEX requires OWNER password"
+        if [ $INTERACTIVE -eq 0 -a $ACTION == check ]; then
+          echo "WARN: OWNER Password is needed but script is run as non interactive, skipping"
+          SKIP=1
+          OK=0
+        else
+          prompt_for_nvowner_password
+          if [ $? -ne 0 ]; then
+            echo "WARN: OWNER Password is needed but empty password entered, skipping"
+            SKIP=1
+            OK=0
+          fi
+        fi
+      fi
+    fi
+    if [ $OK -eq 1 ]; then
+      echo "- reading TPM NVRAM data at index $NV_INDEX"
+      nv_read
+      if [ $? -ne 0 ]; then
+        echo "ERROR: Unable to read TPM NVRAM at index $NV_INDEX"
+        ERROR=1
+        RUN_INIT=1
+        OK=0
+      fi
+    fi
+    if [ $OK -eq 1 ]; then
+      echo "- testing LUKS key on device"
+      luks_test_key
+      if [ $? -ne 0 ]; then
+        echo "ERROR: Unable to open device"
+        ERROR=1
+        RUN_INIT=1
+        OK=0
+      fi
+    fi
+    if [ $OK -eq 1 ]; then
+      if [ $ACTION == seal -a $USE_PCR -eq 0 ]; then
+        echo "ERROR: device is unsealed and must be sealed"
+        RUN_SEAL=1
+        OK=0
+      elif [ $ACTION == unseal -a $USE_PCR -eq 1 ]; then
+        echo "ERROR: device is sealed and must be unsealed"
+        RUN_SEAL=1
+        OK=0
+      else
+        echo "- device is correctly configured"
+      fi
+    fi
+  else
+    NEW=1
+    echo "ERROR: Device is not configured in $LUKS_CONF"
+    ERROR=1
+    RUN_INIT=1
+    OK=0
+  fi
+  # update errors status
+  [ $ERROR -eq 1 -a $ACTION != init ] && ERRORS=1
+  # update report status
+  case $ACTION in
+  check)
+    if [ $SKIP -eq 1 ]; then
+      REPORT+="- $DEVICE: skipped\n"
+    elif [ $ERROR -eq 1 ]; then
+      REPORT+="- $DEVICE: error, call init to repair\n"
+    elif [ $USE_PCR -eq 0 ]; then
+      REPORT+="- $DEVICE: ok (unsealed)\n"
+    else
+      REPORT+="- $DEVICE: ok (sealed)\n"
+    fi
+    return
+    ;;
+  backup)
+    if [ $SKIP -eq 1 ]; then
+      REPORT+="- $DEVICE: skipped\n"
+    elif [ $ERROR -eq 1 ]; then
+      REPORT+="- $DEVICE: error\n"
+    else
+      REPORT+="- $DEVICE: $(cat $LUKS_KEY | base64)\n"
+    fi
+    return
+    ;;
+  init)
+    RUN=$RUN_INIT
+    ;;
+  seal|unseal)
+    RUN=$RUN_SEAL
+    ;;
+  esac
+  # do actions ?
+  if [ $SKIP -eq 1 ]; then
+    REPORT+="- $DEVICE: skipped\n"
+    return
+  elif [ $RUN -eq 0 ]; then
+    if [ $ERROR -eq 1 ]; then
+      REPORT+="- $DEVICE: error\n"
+    elif [ $USE_PCR -eq 0 ]; then
+      REPORT+="- $DEVICE: unchanged (unsealed)\n"
+    else
+      REPORT+="- $DEVICE: unchanged (sealed)\n"
+    fi
+    return
+  fi
+  # do action
+  if [ $ACTION == init ]; then
+    if [ $NV_INDEX -eq 0 ]; then
+      echo "Initializing a new TPM NVRAM..."
+    else
+      echo "Initializing TPM NVRAM at index $NV_INDEX..."
+    fi
+    echo "- asking for TPM NVRAM <owner> password"
+    prompt_for_nvowner_password
+    if [ $? -ne 0 ]; then
+      echo "WARN: <owner> Password is needed but empty password entered, skipping"
+      REPORT+="- $DEVICE: skipped\n"
+      return
+    fi
+    if [ $NV_INDEX -eq 0 ]; then
+      echo "- searching for free TPM NVRAM index"
+      find_free_nv_index
+      if [ $? -ne 0 ]; then
+        echo "ERROR: No more free TPM NVRAM index <= $NV_INDEX_LIMIT available, aborting"
+        exit 1
+      fi
+    fi
+    echo "- using TPM NVRAM at index $NV_INDEX"
+    if [ $NEW -eq 1 ]; then
+      echo "- generating new key file in $LUKS_KEY"
+      keyfile_generate
+      if [ $? -ne 0 ]; then
+        echo "ERROR: Unable to generate new key file, aborting"
+        exit 1
+      fi
+      echo "- adding new key file in a LUKS slot of device"
+      luks_add_key
+      if [ $? -ne 0 ]; then
+        echo "ERROR: Unable to add LUKS key to device, aborting"
+        exit 1
+      fi
+      echo "- new key file added in LUKS slot $_slot_id"
+    else
+      echo "- asking for the LUKS key of the device to write back into the TPM NVRAM"
+      prompt_for_luks_key
+      if [ $? -ne 0 ]; then
+        echo "WARN: Key is needed but empty key entered, skipping"
+        REPORT+="- $DEVICE: skipped\n"
+        return
+      fi
+      echo "- testing LUKS key on device"
+      luks_test_key
+      if [ $? -ne 0 ]; then
+        echo "ERROR: Unable to open device with key, aborting"
+        exit 1
+      fi
+    fi
+    if [ "$NV_USE_PASSWORD" == "AUTH" ]; then
+      echo "- asking for TPM NVRAM <auth> password"
+      prompt_for_nvauth_password
+      if [ $? -ne 0 ]; then
+        echo "WARN: <auth> Password is needed but empty password entered, skipping"
+        REPORT+="- $DEVICE: skipped\n"
+        return
+      fi
+    fi
+    echo "- defining and writing new TPM NVRAM at index $NV_INDEX"
+    nv_define_and_write
+    RC=$?
+    if [ $RC -eq 2 ]; then
+      echo "ERROR: Execution of '$PERMS_FILE' has failed, aborting"
+      exit 1
+    elif [ $RC -ne 0 ]; then
+      echo "ERROR: Unable to define or write new TPM NVRAM at index $NV_INDEX, aborting"
+      exit 1
+    fi
+    echo "- updating $LUKS_CONF configuration"
+    update_conf
+    if [ $? -ne 0 ]; then
+      echo "ERROR: Unable to update $LUKS_CONF file, aborting"
+      exit 1
+    fi
+    echo "- killing all other LUKS slots on device"
+    luks_kill_all
+    if [ $? -ne 0 ]; then
+      echo "ERROR: Unable to delete other LUKS key slots, aborting"
+      exit 1
+    fi
+    echo "- device successfully initialized"
+    REPORT+="- $DEVICE: initialized (unsealed)\n"
+  elif [ $ACTION == seal -o $ACTION == unseal ]; then
+    [ $ACTION == seal ] && NV_SEAL_WITH_PCR=1
+    if [ $NV_SEAL_WITH_PCR -eq $USE_PCR ]; then
+      if [ $USE_PCR -eq 0 ]; then
+        REPORT+="- $DEVICE: unchanged (unsealed)\n"
+      else
+        REPORT+="- $DEVICE: unchanged (sealed)\n"
+      fi
+      return
+    fi
+    #some text consts
+    if [ $ACTION == seal ]; then
+      _action_ing=Sealing
+      _action_ed=sealed
+    else
+      _action_ing=Unsealing
+      _action_ed=unsealed
+    fi
+    echo "$_action_ing TPM NVRAM at index $NV_INDEX..."
+    echo "- asking for TPM NVRAM <owner> password"
+    prompt_for_nvowner_password
+    if [ $? -ne 0 ]; then
+      echo "WARN: <owner> Password is needed but empty password entered, skipping"
+      REPORT+="- $DEVICE: skipped\n"
+      return
+    fi
+    if [ "$NV_USE_PASSWORD" == "AUTH" ]; then
+      echo "- asking for TPM NVRAM <auth> password"
+      prompt_for_nvauth_password
+      if [ $? -ne 0 ]; then
+        echo "WARN: <auth> Password is needed but empty password entered, skipping"
+        REPORT+="- $DEVICE: skipped\n"
+        return
+      fi
+    fi
+    echo "- defining and writing new TPM NVRAM at index $NV_INDEX"
+    nv_define_and_write
+    RC=$?
+    if [ $RC -eq 2 ]; then
+      echo "ERROR: Execution of '$PERMS_FILE' has failed, aborting"
+      exit 1
+    elif [ $RC -ne 0 ]; then
+      echo "ERROR: Unable to define or write new TPM NVRAM at index $NV_INDEX, aborting"
+      exit 1
+    fi
+    echo "- device successfully $_action_ed"
+    REPORT+="- $DEVICE: $_action_ed\n"
+  fi
+}
+
+#
+# main
+#
+while [ -n "$1" ]; do
+  case "$1" in
+  -b|--batch)          INTERACTIVE=0 && shift ;;
+  -d|--debug)          set -x && shift ;;
+  -a|--auth-password)  NV_USE_PASSWORD=AUTH && shift ;;
+  -o|--owner-password) NV_USE_PASSWORD=OWNER && shift ;;
+  -n|--dry-run)        DRY_RUN=1 && shift ;;
+  -h|--help)           usage && exit 255 ;;
+  -*)                  echo "Invalid option $1" && usage && exit 255 ;;
+  check|init|seal|unseal|backup)
+    [ -n "$ACTION" ] && usage && exit 255
+    ACTION="$1" && shift ;;
+  *)
+    [ -z "$ACTION" -o -n "$DEVICE" ] && echo "Too many arguments" && usage && exit 255
+    DEVICE="$1" && shift ;;
+  esac
+done
+
+[ -z "$ACTION" ] && echo "Mission argument: action" && usage && exit 255
+
+# always check that TPM is enabled and owned
+tpm_enabled
+tpm_owned
+tpm_tcsd
+
+PROGRAM="$(devices_get loop)"
+if [ -z "$PROGRAM" ]; then
+  echo "ERROR: no device found."
+  exit 11
+fi
+
+ERRORS=0
+echo
+eval "$PROGRAM"
+print_separator
+
+echo -e -n "LUKS $ACTION status:\n$REPORT"
+
+if [ $ERRORS -ne 0 ]; then
+  print_separator
+  echo "There are errors, you can use \`${0##*/} init\` to repair them."
+  echo
+  exit 1
+fi
+
+echo
+exit 0
