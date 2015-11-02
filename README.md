@@ -1,5 +1,7 @@
 This is the new documentation on how to use LUKS with TPM enabled on RHEL7.
 
+As of 2015-11-02, TrustedGRUB2 1.2.1 + tpm-luks + tpm-tools is working on HP desktop with TPM enabled. Server to come soon...
+
 Old documentation can be found here: [README_OLD]
 
 ## Introduction
@@ -80,12 +82,13 @@ sh deploy.sh
 
 You can now generate new LUKS keys and seal them:
 ```
-tpm-luks-ctl init
-tpm-luks-ctl backup
-reboot
-tpm-luks-ctl seal
-reboot
-tpm-luks-ctl check
+tpm-luks-ctl init      to generate new LUKS keys and save them in the TPM NVRAM
+tpm-luks-ctl backup    to dump the LUKS keys and backup them in a safe place
+dracut --force         to update initramfs
+reboot                 to verify it works and have all PCRs computed correctly
+tpm-luks-ctl seal      to seal the TPM NVRAM
+reboot                 to verify it restarts automatically
+tpm-luks-ctl check     to be sure
 ```
 
 For the first boot, keys are not sealed and no password is required.

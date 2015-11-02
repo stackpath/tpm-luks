@@ -49,7 +49,7 @@ if [ "$PASS" == "" -o "$PASS" == "read" ]; then
 	# An index needs a password if authentication bits matches AUTHREAD or OWNERREAD
 	if [ -n "$NVRESULT" -a -z "$PASS" ]; then
 		AUTHREAD=$(( 0x$NVRESULT & $TPM_NV_PER_AUTHREAD ))
-		OWNERREAD=$(( 0x$NVRESULT & $TPM_NV_PER_OWNERREA ))
+		OWNERREAD=$(( 0x$NVRESULT & $TPM_NV_PER_OWNERREAD ))
 		
 		if [ $AUTHREAD -ne 0 -o $OWNERREAD -ne 0 ]; then
 			ask_for_password --tries 3 --tty-echo-off \

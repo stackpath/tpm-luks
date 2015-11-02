@@ -108,7 +108,8 @@ function nv_define_and_write
   fi
   
   _use_pcr=0
-  _options="--pwdo='$OWNER_PASSWORD'"
+  _options=--pwdo="$OWNER_PASSWORD"
+  _writepass=--password="$OWNER_PASSWORD"
   _perms="OWNERWRITE"
   
   if [ $NV_SEAL_WITH_PCR -eq 1 -a -n "$PERMS_FILE" ]; then
@@ -117,18 +118,27 @@ function nv_define_and_write
       return 2
     fi
     _use_pcr=1
-    _options="$_options -f $LUKS_PERMS"
+    _options+=" -f $LUKS_PERMS"
   fi
   if [ "$NV_USE_PASSWORD" == "AUTH" ]; then
-    _options="$_options --pwda='$AUTH_PASSWORD'"
+    _options+=" " ; _options+=--pwda="$AUTH_PASSWORD"
+    _writepass=--password="$AUTH_PASSWORD"
     _perms="AUTHREAD|OWNERWRITE"
   elif [ "$NV_USE_PASSWORD" == "OWNER" ]; then
     _perms="OWNERREAD|OWNERWRITE"
   fi
   
   if [ $DRY_RUN -eq 0 ]; then
-    tpm_nvdefine -i @NV_INDEX -s $LUKS_KEY_SIZE -f $LUKS_KEY -p "$_perms" -f $LUKS_PERMS --pwdo="$OWNER_PASSWORD" "$_options"
-    [ $? -ne 0 ] && return 1
+    tpm_nvdefine -i $NV_INDEX -s $LUKS_KEY_SIZE -p "$_perms" $_options
+    if [ $? -ne 0 ]; then
+      tpm_nvrelease -i $NV_INDEX --pwdo="$OWNER_PASSWORD"
+      return 1
+    fi
+    tpm_nvwrite -i $NV_INDEX -s $LUKS_KEY_SIZE -f $LUKS_KEY $_writepass
+    if [ $? -ne 0 ]; then
+      tpm_nvrelease -i $NV_INDEX --pwdo="$OWNER_PASSWORD"
+      return 1
+    fi
   else
     if [ $_use_pcr -eq 0 ]; then
       echo "=> dry-run: define new TPM NVRAM at index $NV_INDEX with permission $_perms"
@@ -229,7 +239,7 @@ function luks_kill_all
       cryptsetup luksOpen $DEVICE --key-slot $_slot_id --test-passphrase --key-file $LUKS_KEY &>/dev/null
       if [ $? -ne 0 ]; then
         if [ $DRY_RUN -eq 0 ]; then
-          cryptsetup luksKillSlot $DEVICE --key-slot $_slot_id --key-file $LUKS_KEY &>/dev/null
+          cryptsetup luksKillSlot $DEVICE $_slot_id --key-file $LUKS_KEY &>/dev/null
         else
           echo "=> dry-run: kill LUKS key in slot $_slot_id"
         fi
