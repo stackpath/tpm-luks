@@ -777,8 +777,9 @@ fi
 
 if [ $NEED_DRACUT -eq 1 ]; then
   echo "File $LUKS_CONF has been updated, you must update dracut:"
-  echo "- dracut --force"
+  echo "- tpm-luks-ctl backup"
   echo "- tpm-luks-ctl unseal"
+  echo "- dracut --force"
   echo "- reboot"
   echo "- tpm-luks-ctl seal"
   echo "- reboot"
