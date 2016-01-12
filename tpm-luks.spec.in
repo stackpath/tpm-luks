@@ -36,7 +36,8 @@ make %{?_smp_mflags}
 %install
 [ "${RPM_BUILD_ROOT}" != "/" ] && [ -d ${RPM_BUILD_ROOT} ] && rm -rf ${RPM_BUILD_ROOT};
 make install DESTDIR=$RPM_BUILD_ROOT
-ln -s $RPM_BUILD_ROOT/%{_sbindir}/tpm-luks/tpm-luks-svc $RPM_BUILD_ROOT/etc/init.d/tpm-luks-svc
+mkdir -p $RPM_BUILD_ROOT/etc/init.d/
+ln -s /%{_sbindir}/tpm-luks/tpm-luks-svc $RPM_BUILD_ROOT/etc/init.d/tpm-luks-svc
 
 %clean
 [ "${RPM_BUILD_ROOT}" != "/" ] && [ -d ${RPM_BUILD_ROOT} ] && rm -rf ${RPM_BUILD_ROOT};
