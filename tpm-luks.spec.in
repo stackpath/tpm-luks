@@ -7,7 +7,7 @@
 
 Name:		@PACKAGE@
 Version:	@VERSION@
-Release:	3%{?dist}
+Release:	4%{?dist}
 Summary:	Utility for storing a LUKS key using a TPM
 
 Group:		Security
