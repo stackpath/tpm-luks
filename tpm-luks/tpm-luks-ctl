@@ -1,3 +1,4 @@
+#!/bin/bash
 RAND_SOURCE=/dev/urandom
 LUKS_CONF=/etc/tpm-luks.conf
 LUKS_KEY=/dev/shm/luks.key
@@ -396,7 +397,7 @@ function devices_get
       _nv_index=0
       _in_conf=0
       _perms_file=$DEFAULT_PERMS_FILE
-      _conf=$(cat $LUKS_CONF | grep -v "^\s*#")
+      _conf=$(cat $LUKS_CONF | grep -v "^\s*#" | grep "^$DEVNAME:")
       if [ -n "$_conf" ]; then
         _nv_index=$(echo $_conf | cut -d: -f2)
         if [ -n "$_nv_index" ]; then
@@ -436,7 +437,7 @@ function usage
   echo -e "  check                  check configuration"
   echo -e "  init                   initialize missing LUKS partitions and repair existing LUKS partitions"
   echo -e "  seal                   seal TPM NVRAM using PCRs, removing the need for TPM NVRAM password"
-  echo -e "  useal                  unseal TPM NVRAM, adding the need for TPM NVRAM"
+  echo -e "  unseal                 unseal TPM NVRAM, adding the need for TPM NVRAM"
   echo -e "  backup                 list all keys as base64 for backup purpose"
   echo
   echo -e "[device] must be as in '$LUKS_CONF' or \`blkid\`."
