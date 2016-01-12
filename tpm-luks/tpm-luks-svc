@@ -1,0 +1,100 @@
+#!/bin/bash
+
+# chkconfig: 2345 00 00
+
+LUKS_CONF=/etc/tpm-luks.conf
+KEYFILE=/dev/shm/luks.key
+NVSIZE=32
+CRYPTTAB=/etc/crypttab
+TPM_NV_PER_AUTHREAD=0x00040000
+TPM_NV_PER_OWNERREAD=0x00020000
+
+ERROR=0
+
+case "$1" in
+	start)
+		;;
+	*)
+		exit 1
+		;;
+esac
+
+function wipe_file
+{
+ 	dd if=/dev/zero of=$KEYFILE bs=1c count=$NVSIZE >/dev/null 2>&1
+	rm -f $KEYFILE
+}
+
+trap wipe_file EXIT      
+
+(blkid -c /dev/null -t TYPE=crypto_LUKS -o export ; echo) \
+| while read _line ; do
+	eval $_line
+	if [ -z "$_line" ]; then
+		MAPNAME=$( cat $CRYPTTAB | grep " UUID=$UUID " | cut -d' ' -f1 )
+		[ -z "$MAPNAME" ] && MAPNAME=luks-$UUID
+		_cipher=$( cryptsetup -v status $MAPNAME 2> /dev/null | grep cipher )
+		if [ -z "$_cipher" ]; then
+			NVINDEX=0
+			_conf=$(cat $LUKS_CONF | grep -v "^\s*#" | grep "^$DEVNAME:")
+			if [ -n "$_conf" ]; then
+				NVINDEX=$(echo $_conf | cut -d: -f2)
+				if [ -n "$NVINDEX" ]; then
+					echo Opening $DEVNAME as /dev/mapper/$MAPNAME using TPM NVRAM at index $NVINDEX...
+					NVINDEX=$(printf "0x%x" $NVINDEX)
+					NVMATCH=$(getcapability -cap 0x11 -scap $NVINDEX | awk -F ": " '$1 ~ /Matches/ { print $2 }')
+					NVSIZE=$(getcapability -cap 0x11 -scap $NVINDEX | awk -F= '$1 ~ /dataSize/ { print $2 }')
+					NVRESULT=$(getcapability -cap 0x11 -scap $NVINDEX | awk '$1 ~ /Result/ { print $11 }')
+					
+					if [ -z "$NVSIZE" ]; then
+						echo "- Skipped: no TPM NVRAM found"
+						ERROR=1
+						continue
+					fi
+					
+					if [ -n "$MATCH1" -a "$MATCH1" != "Yes" ]; then
+						echo "- Skipped: TPM NVRAM does not match PCR state"
+						ERROR=1
+						continue
+					fi
+					
+					if [ -n "$NVRESULT" -a -z "$PASS" ]; then
+						AUTHREAD=$(( 0x$NVRESULT & $TPM_NV_PER_AUTHREAD ))
+						OWNERREAD=$(( 0x$NVRESULT & $TPM_NV_PER_OWNERREAD ))
+						if [ $AUTHREAD -ne 0 -o $OWNERREAD -ne 0 ]; then
+							echo "- Skipped: TPM NVRAM needs a password"
+							ERROR=1
+							continue
+						fi
+					fi
+					
+					nv_readvalue -ix $NVINDEX -sz $NVSIZE -of $KEYFILE >/dev/null 2>&1
+					RC=$?
+					if [ $RC -ne 0 ]; then
+						echo "- Error: reading TPM NVRAM returns error $RC"
+						ERROR=1
+						continue
+					fi
+					
+					cryptsetup luksOpen $DEVNAME $MAPNAME --key-file $KEYFILE --keyfile-size $NVSIZE
+					RC=$?
+					wipe_file
+					if [ $RC -ne 0 ]; then
+						echo "- Error: cryptsetup returns error $RC"
+						ERROR=1
+						continue
+					fi
+					
+					echo "- Success"
+				fi
+			fi
+		fi
+	fi
+done
+
+exit $ERROR
+
+#lsblk -p -r -o NAME,UUID,FSTYPE | grep crypto_LUKS | while read NAME UUID FSTYPE ; do
+#	_cipher=$( cryptsetup -v status luks-$UUID 2> /dev/null | grep cipher )
+#	[ -z "$_cipher" ] && echo $NAME to open
+#done

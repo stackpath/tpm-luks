@@ -36,6 +36,7 @@ make %{?_smp_mflags}
 %install
 [ "${RPM_BUILD_ROOT}" != "/" ] && [ -d ${RPM_BUILD_ROOT} ] && rm -rf ${RPM_BUILD_ROOT};
 make install DESTDIR=$RPM_BUILD_ROOT
+ln -s $RPM_BUILD_ROOT/%{_sbindir}/tpm-luks/tpm-luks-svc $RPM_BUILD_ROOT/etc/init.d/tpm-luks-svc
 
 %clean
 [ "${RPM_BUILD_ROOT}" != "/" ] && [ -d ${RPM_BUILD_ROOT} ] && rm -rf ${RPM_BUILD_ROOT};
@@ -49,6 +50,7 @@ make install DESTDIR=$RPM_BUILD_ROOT
 %dir %{dracutlibdir}/modules.d/%{dracut_mod_name}
 %{dracutlibdir}/modules.d/%{dracut_mod_name}/*
 %config(noreplace) /etc/tpm-luks.conf
+/etc/init.d/tpm-luks-svc
 
 %changelog
 * Tue Apr 09 2013 Ryan Harper <ryanh@us.ibm.com>
