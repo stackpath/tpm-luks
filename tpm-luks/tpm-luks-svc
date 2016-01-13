@@ -1,6 +1,19 @@
 #!/bin/bash
 
+#
+# Service to automatically call cryptsetup open on devices not automatically opened by
+# dracut during boot.
+# This allows to specify additionnal devices without having to modify /etc/default/grub.
+# Devices to open must have the following:
+# - type must be of type crypto_LUKS, visible in `blkid -c /dev/null`
+# - map name is luks-<uuid> unless an entry is present in /etc/crypttab
+# - if device is present in /etc/crypttab, it must have the attribute `noauto` to prevent open at boot
+# - if mount is needed at boot time, it must have nofail option in /etc/fstab
+#
+#
 # chkconfig: 2345 00 00
+# description: Mount additional LUKS partitions
+#
 
 LUKS_CONF=/etc/tpm-luks.conf
 KEYFILE=/dev/shm/luks.key
@@ -31,7 +44,7 @@ trap wipe_file EXIT
 | while read _line ; do
 	eval $_line
 	if [ -z "$_line" ]; then
-		MAPNAME=$( cat $CRYPTTAB | grep " UUID=$UUID " | cut -d' ' -f1 )
+		MAPNAME=$( cat $CRYPTTAB | grep -v "^\s*#" | grep " UUID=$UUID " | cut -d' ' -f1 )
 		[ -z "$MAPNAME" ] && MAPNAME=luks-$UUID
 		_cipher=$( cryptsetup -v status $MAPNAME 2> /dev/null | grep cipher )
 		if [ -z "$_cipher" ]; then
