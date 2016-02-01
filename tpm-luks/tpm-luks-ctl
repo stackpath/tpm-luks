@@ -674,15 +674,17 @@ function loop
         return
       fi
     fi
-    echo "- defining and writing new TPM NVRAM at index $NV_INDEX"
-    nv_define_and_write
-    RC=$?
-    if [ $RC -eq 2 ]; then
-      echo "ERROR: Execution of '$PERMS_FILE' has failed, aborting"
-      exit 1
-    elif [ $RC -ne 0 ]; then
-      echo "ERROR: Unable to define or write new TPM NVRAM at index $NV_INDEX, aborting"
-      exit 1
+    if [ $NEW -ne 2 ]; then
+      echo "- defining and writing new TPM NVRAM at index $NV_INDEX"
+      nv_define_and_write
+      RC=$?
+      if [ $RC -eq 2 ]; then
+        echo "ERROR: Execution of '$PERMS_FILE' has failed, aborting"
+        exit 1
+      elif [ $RC -ne 0 ]; then
+        echo "ERROR: Unable to define or write new TPM NVRAM at index $NV_INDEX, aborting"
+        exit 1
+      fi
     fi
     if [ $NEW -eq 1 -o $NEW -eq 2 ]; then
       echo "- updating $LUKS_CONF configuration"
