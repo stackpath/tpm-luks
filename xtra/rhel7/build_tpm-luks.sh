@@ -11,7 +11,7 @@ mkdir -p src work
 url=https://github.com/momiji/tpm-luks
 file=${url##*/}-0.8.tar.gz
 dir=${file%.tar.gz}
-pkg=$dir-5.el7
+pkg=$dir-6.el7
 spec=tpm-luks.spec
 specf=${spec##*/}
 
