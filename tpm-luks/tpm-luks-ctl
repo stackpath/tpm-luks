@@ -11,6 +11,7 @@ UUID=
 IN_CONF=0
 NV_INDEX=0
 NV_INDEX_LIMIT=128
+NV_USE_INDEX=0
 USE_PCR=
 PERMS_FILE=
 INTERACTIVE=1
@@ -430,6 +431,7 @@ function usage
   echo -e "  -d, --debug            run in debug mode"
   echo -e "  -a, --auth-password    add AUTH password when writing TPM NVRAM"
   echo -e "  -o, --owner-password   add OWNER password when writing TPM NVRAM"
+  echo -e "  -i, --index [index]    use this index for all devices to initialize, use -1 to create a new index"
   echo -e "  -n, --dry-run          do not update TPM NVRAM nor update LUKS keys"
   echo -e "  -h, --help             show help"
   echo
@@ -592,6 +594,10 @@ function loop
   fi
   # do action
   if [ $ACTION == init ]; then
+    if [ $NV_INDEX -eq 0 -a $NV_USE_INDEX -gt 0 ]; then
+      NV_INDEX=$NV_USE_INDEX
+      NEW=2
+    fi
     if [ $NV_INDEX -eq 0 ]; then
       echo "Initializing a new TPM NVRAM..."
     else
@@ -611,6 +617,15 @@ function loop
         echo "ERROR: No more free TPM NVRAM index <= $NV_INDEX_LIMIT available, aborting"
         exit 1
       fi
+      if [ $NV_USE_INDEX -eq -1 ]; then
+        NV_USE_INDEX=$NV_INDEX
+      fi
+    elif [ $NEW -eq 2 ]; then
+      nv_read
+      if [ $? -ne 0 ]; then
+      	echo "INFO: Unable to read TPM NVRAM index $NV_INDEX, will initialize TPM NVRAM"
+      	NEW=1
+      fi
     fi
     echo "- using TPM NVRAM at index $NV_INDEX"
     if [ $NEW -eq 1 ]; then
@@ -620,6 +635,14 @@ function loop
         echo "ERROR: Unable to generate new key file, aborting"
         exit 1
       fi
+      echo "- adding new key file in a LUKS slot of device"
+      luks_add_key
+      if [ $? -ne 0 ]; then
+        echo "ERROR: Unable to add LUKS key to device, aborting"
+        exit 1
+      fi
+      echo "- new key file added in LUKS slot $_slot_id"
+    elif [ $NEW -eq 2 ]; then
       echo "- adding new key file in a LUKS slot of device"
       luks_add_key
       if [ $? -ne 0 ]; then
@@ -661,7 +684,7 @@ function loop
       echo "ERROR: Unable to define or write new TPM NVRAM at index $NV_INDEX, aborting"
       exit 1
     fi
-    if [ $NEW -eq 1 ]; then
+    if [ $NEW -eq 1 -o $NEW -eq 2 ]; then
       echo "- updating $LUKS_CONF configuration"
       update_conf
       if [ $? -ne 0 ]; then
@@ -737,6 +760,7 @@ while [ -n "$1" ]; do
   -d|--debug)          set -x && shift ;;
   -a|--auth-password)  NV_USE_PASSWORD=AUTH && shift ;;
   -o|--owner-password) NV_USE_PASSWORD=OWNER && shift ;;
+  -i|--index)          [ -z "$2" ] && usage && exit 255 ; NV_USE_INDEX=$2 && shift && shift || usage ;;
   -n|--dry-run)        DRY_RUN=1 && shift ;;
   -h|--help)           usage && exit 255 ;;
   -*)                  echo "Invalid option $1" && usage && exit 255 ;;
@@ -756,7 +780,7 @@ tpm_enabled
 tpm_owned
 tpm_tcsd
 
-PROGRAM="$(devices_get loop)"
+PROGRAM="$(devices_get loop | sort)"
 if [ -z "$PROGRAM" ]; then
   echo "ERROR: no device found."
   exit 11
