@@ -1,6 +1,7 @@
 This is the new documentation on how to use LUKS with TPM enabled on RHEL7.
 
 As of 2015-11-02, TrustedGRUB2 1.2.1 + tpm-luks + tpm-tools is working on HP desktop with TPM enabled.
+
 As of 2016-02-01, installed on HP Apollo production servers, with two additions: reuse TPM NVRAM index as TPM is not big enough for 24 disks + tpm-luks-svc to open devices after boot time, for data disks, to prevent grub.cfg modification - see C. Notes.
 
 Old documentation can be found here: [README_OLD]
