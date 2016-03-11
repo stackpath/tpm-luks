@@ -1,6 +1,7 @@
 This is the new documentation on how to use LUKS with TPM enabled on RHEL7.
 
-As of 2015-11-02, TrustedGRUB2 1.2.1 + tpm-luks + tpm-tools is working on HP desktop with TPM enabled. Server to come soon...
+As of 2015-11-02, TrustedGRUB2 1.2.1 + tpm-luks + tpm-tools is working on HP desktop with TPM enabled.
+As of 2016-02-01, installed on HP Apollo production servers, with two additions: reuse TPM NVRAM index as TPM is not big enough for 24 disks + tpm-luks-svc to open devices after boot time, for data disks, to prevent grub.cfg modification - see C. Notes.
 
 Old documentation can be found here: [README_OLD]
 
@@ -114,16 +115,35 @@ If you want to unseal the TPM, before a reboot for example, remember to seal aft
 * `reboot`
 * seal: `tpm-luks-ctl seal`
 
-To add new LUKS partitions:
+To add new LUKS partitions at boot time:
 * modify `/etc/default/grub` file with new partitions info
 * unseal: `tpm-luks-ctl unseal`
 * add new partitions: `tpm-luks-ctl init`
 * save backup: `tpm-luks-ctl backup`
-* `grub-mkconfig -o /boot/grub/grub.cfg`
-* `dracut --force`
-* `reboot`
+* update grub: `grub-mkconfig -o /boot/grub/grub.cfg`
+* update iniramfs: `dracut --force`
+* reboot: `reboot`
 * seal: `tpm-luks-ctl seal`
 * `reboot` to verify everything is ok
+
+To add new LUKS partitions (i.e. for data) just after boot time, with tpm-luks-svc - beware, the size of TPM NVRAM is limited, so it might be usefull to use the same TPM NVRAM for all data disks -- here I'm using index 1:
+* format all data disks using `cyptsetup luksFormat` with a very simple text password for example, and get it's UUID
+```
+echo -n "abc" > luks.key
+cryptsetup luksFormat /dev/sdx --key-file luks.key
+cryptsetup luksDump /dev/sdx | grep UUID: | awk '{print $2}'
+```
+* add the new disks in `/etc/crypttab` with `noauto` option
+```
+data0x UUID=x*** none noauto
+```
+* add new paritions with index 1: `tpm-luks-ctl init -i 1`
+* save backup: `tpm-luks-ctl backup`
+* start service automatically: `chkconfig --add tpm-luks-svc`
+* unseal: `tpm-luks-ctl unseal`
+* reboot: `reboot`
+* seal: `tpm-luks-ctl seal`
+* reboot: `reboot`
 
 [README_OLD]: README_OLD.md
 [trousers]: http://sourceforge.net/projects/trousers/
