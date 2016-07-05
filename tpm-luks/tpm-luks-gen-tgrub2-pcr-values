@@ -59,8 +59,10 @@
 #
 #
 PCRS="4 5 8 9 10 11"
+TPM_DEVICE=/sys/class/tpm/tpm0/device
+[ -d $TPM_DEVICE ] || TPM_DEVICE=/sys/class/misc/tpm0/device
 TMPFILE=
-SOURCE=/sys/class/misc/tpm0/device/pcrs
+SOURCE=$TPM_DEVICE/pcrs
 OUTFILE=/dev/stdout
 
 if [ -z "${PCRS}" ]; then
