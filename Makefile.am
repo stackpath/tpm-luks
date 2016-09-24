@@ -38,12 +38,7 @@ dist_plymouth_SCRIPTS=dracut/RHEL7/crypt-tpm/cryptroot-ask.sh \
                       dracut/RHEL7/crypt-tpm/probe-keydev.sh
 endif
 
-dist_sbin_SCRIPTS=tpm-luks/tpm-luks-chain-hashes \
-                  tpm-luks/tpm-luks \
-                  tpm-luks/tpm-luks-gen-tgrub-pcr-values \
-                  tpm-luks/tpm-luks-gen-tgrub2-pcr-values \
-                  tpm-luks/tpm-luks-update \
-                  tpm-luks/tpm-luks-init \
+dist_sbin_SCRIPTS=tpm-luks/tpm-luks-gen-tgrub2-pcr-values \
                   tpm-luks/tpm-luks-ctl \
                   tpm-luks/tpm-luks-svc
 
