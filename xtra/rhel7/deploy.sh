@@ -16,8 +16,9 @@ cont "adding tpm-tools tpm-luks trustedGRUB2 to yum update exclusions"
 exclude=$(
   (
     echo "tpm-tools tpm-luks TrustedGRUB2" | tr ' ' '\n'
-    cat /etc/yum.conf | grep '^exclude=' | sed -r 's/^exclude=(.*)/\1/' | tr ' ' '\n' | grep -v '^\s*$'
+																									   
   ) | sort -u | tr '\n' ' '
+    cat /etc/yum.conf | grep '^exclude=' | sed -r 's/^exclude=(.*)/\1/' | tr ' ' '\n' | grep -v '^\s*$'
 )
 echo exclude=$exclude
 
@@ -30,6 +31,7 @@ echo exclude=$exclude
 
 cont "replacing grub2 with TrustedGRUB2 package..."
 yum remove -y grub2 grub2-tools
+[ -d /boot/grub2 ] && mv /boot/grub2 /boot/grub2.old
 rpm -ivh ./TrustedGRUB2-[0-9]*.x86_64.rpm
 
 cont "replacing boot loader..."
