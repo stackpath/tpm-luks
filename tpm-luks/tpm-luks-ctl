@@ -21,6 +21,7 @@ NEED_AUTH_PASSWORD=0
 NEED_OWNER_PASSWORD=0
 AUTH_PASSWORD=
 OWNER_PASSWORD=
+LUKS_PASSWORD=
 ACTION=
 REPORT=
 NV_SEAL_WITH_PCR=0
@@ -225,8 +226,12 @@ function luks_add_key
   [ -z "$_key_slot" ] && return 1
   
   if [ $DRY_RUN -eq 0 ]; then
-    echo "You will now be prompted to enter any valid LUKS passphrase in order to store the new TPM NVRAM secret in LUKS key slot $_key_slot:"
-    cryptsetup luksAddKey --key-slot $_key_slot $DEVICE $LUKS_KEY || return 1
+    if [ -z "$LUKS_PASSWORD" ]; then
+      echo "You will now be prompted to enter any valid LUKS passphrase in order to store the new TPM NVRAM secret in LUKS key slot $_key_slot:"
+      cryptsetup luksAddKey --key-slot $_key_slot $DEVICE $LUKS_KEY || return 1
+    else
+      echo -n "$LUKS_PASSWORD" | cryptsetup luksAddKey --key-slot $_key_slot $DEVICE $LUKS_KEY || return 1
+    fi
   else
     echo "=> dry-run: add new LUKS key in slot $_key_slot"
   fi
@@ -432,8 +437,11 @@ function usage
   echo -e "  -b, --batch            run as batch (non-interactive), only for 'check' action"
   echo -e "  -d, --debug            run in debug mode"
   echo -e "  -a, --auth-password    add AUTH password when writing TPM NVRAM"
+  echo -e "  -ap [password]         set AUTH password"
   echo -e "  -o, --owner-password   add OWNER password when writing TPM NVRAM"
+  echo -e "  -op [password]         set OWNER password"
   echo -e "  -i, --index [index]    use this index for all devices to initialize, use -1 to create a new index"
+  echo -e "  -lp [password]         set LUKS password, only if text password"
   echo -e "  -n, --dry-run          do not update TPM NVRAM nor update LUKS keys"
   echo -e "  -h, --help             show help"
   echo
@@ -763,8 +771,11 @@ while [ -n "$1" ]; do
   -b|--batch)          INTERACTIVE=0 && shift ;;
   -d|--debug)          set -x && shift ;;
   -a|--auth-password)  NV_USE_PASSWORD=AUTH && shift ;;
+  -ap)                 [ -z "$2" ] && usage && exit 255 ; AUTH_PASSWORD="$2" && shift && shift || usage ;;
   -o|--owner-password) NV_USE_PASSWORD=OWNER && shift ;;
+  -op)                 [ -z "$2" ] && usage && exit 255 ; OWNER_PASSWORD="$2" && shift && shift || usage ;;
   -i|--index)          [ -z "$2" ] && usage && exit 255 ; NV_USE_INDEX=$2 && shift && shift || usage ;;
+  -lp)                 [ -z "$2" ] && usage && exit 255 ; LUKS_PASSWORD="$2" && shift && shift || usage ;;
   -n|--dry-run)        DRY_RUN=1 && shift ;;
   -h|--help)           usage && exit 255 ;;
   -*)                  echo "Invalid option $1" && usage && exit 255 ;;
