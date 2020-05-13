@@ -17,10 +17,20 @@ DEVICE=$1
 NAME=$2
 PASS=$3
 
+UUID=$(blkid $DEVICE -s UUID | cut -d= -f2 | sed 's/"//g;s/ //g')
+
 if [ "$PASS" == "" -o "$PASS" == "read" ]; then
 
+	# Check for UUID 
+	info "Looking for Device UUID: $UUID"
+	NVINDEX=$(cat $TPM_LUKS_CONF | grep -v "^\s*#" | grep "^${UUID}:" | cut -d: -f2)
+
 	# Find the device index based on the device name
-	NVINDEX=$(cat $TPM_LUKS_CONF | grep -v "^\s*#" | grep $DEVICE | cut -d: -f2)
+	if [ -z "$NVINDEX" ]; then
+		info "Index of $UUID not found"
+		info "Looking for index of $DEVICE"
+		NVINDEX=$(cat $TPM_LUKS_CONF | grep -v "^\s*#" | grep $DEVICE | cut -d: -f2)
+        fi
 
 	if [ -z "$NVINDEX" ]; then
 		cryptroot-ask-tpm $DEVICE $NAME input

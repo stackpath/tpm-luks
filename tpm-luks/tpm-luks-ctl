@@ -367,7 +367,11 @@ function readpass
 # upsert configuration with @DEVICE @NV_INDEX and tgrub2 file
 function update_conf
 {
-  _conf=$(cat $LUKS_CONF | grep "^$DEVICE:")
+  _conf=$(cat $LUKS_CONF | grep "^$UUID:")
+  if [ -z "$_conf" ]; then
+    _conf=$(cat $LUKS_CONF | grep "^$DEVICE:")
+  fi
+
   if [ -n "$_conf" ]; then
     _nv_index=$(echo $_conf | cut -d: -f2)
     if [ -n "$_nv_index" ]; then
@@ -378,8 +382,8 @@ function update_conf
   fi
   
   rm -f $LUKS_CONF.new
-  cat $LUKS_CONF | grep -v "^$DEVICE:" > $LUKS_CONF.new
-  echo $DEVICE:$NV_INDEX:$DEFAULT_PERMS_FILE >> $LUKS_CONF.new
+  cat $LUKS_CONF | grep -v "^$DEVICE:" | grep -v "^$UUID:"  > $LUKS_CONF.new
+  echo $UUID:$NV_INDEX:$DEFAULT_PERMS_FILE >> $LUKS_CONF.new
 
   if [ $DRY_RUN -eq 0 ]; then
     cp -f $LUKS_CONF $LUKS_CONF.bak || return 1
@@ -405,7 +409,10 @@ function devices_get
       _nv_index=0
       _in_conf=0
       _perms_file=$DEFAULT_PERMS_FILE
-      _conf=$(cat $LUKS_CONF | grep -v "^\s*#" | grep "^$DEVNAME:")
+      _conf=$(cat $LUKS_CONF | grep "^$UUID:")
+      if [ -z "$_conf" ]; then
+        _conf=$(cat $LUKS_CONF | grep "^$DEVNAME:")
+      fi
       if [ -n "$_conf" ]; then
         _nv_index=$(echo $_conf | cut -d: -f2)
         if [ -n "$_nv_index" ]; then
